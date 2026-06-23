@@ -1,4 +1,6 @@
 faster-whisper
 numpy
+pillow
 pyaudio
+pystray
 sounddevice

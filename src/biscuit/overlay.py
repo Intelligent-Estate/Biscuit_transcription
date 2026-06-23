@@ -8,7 +8,7 @@ from tkinter import filedialog
 from typing import Callable
 
 from .config import BiscuitConfig
-from .win32_api import RightClickContext
+from .desktop import RightClickContext
 
 
 BLUE_BLACK = "#07111f"
@@ -49,7 +49,13 @@ class SettingsCallbacks:
 
 
 class BiscuitOverlay:
-    def __init__(self, root: tk.Tk, config: BiscuitConfig, settings_callbacks: SettingsCallbacks):
+    def __init__(
+        self,
+        root: tk.Tk,
+        config: BiscuitConfig,
+        settings_callbacks: SettingsCallbacks,
+        show_fallback_toolbar: bool = True,
+    ):
         self.root = root
         self.config = config
         self.settings_callbacks = settings_callbacks
@@ -61,7 +67,10 @@ class BiscuitOverlay:
         self.model_var = tk.StringVar(value=config.model_path)
         self.language_var = tk.StringVar(value=config.language)
         self.provider_var = tk.StringVar(value=config.provider)
-        self._build_toolbar()
+        if show_fallback_toolbar:
+            self._build_toolbar()
+        else:
+            self.root.withdraw()
 
     def show_action(self, context: RightClickContext, on_biscuit: Callable[[RightClickContext], None]) -> None:
         self.close_action()

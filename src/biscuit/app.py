@@ -17,8 +17,9 @@ from .config import (
     save_config,
 )
 from .overlay import BiscuitOverlay, SettingsCallbacks
+from .tray import TrayCallbacks, TrayController
+from .desktop import MouseHook, RightClickContext, get_foreground_context, send_escape, send_unicode_text
 from .transcription import TranscriptionError, transcribe_audio
-from .win32_api import MouseHook, RightClickContext, send_escape, send_unicode_text
 
 
 class BiscuitApp:
@@ -27,24 +28,40 @@ class BiscuitApp:
         self.config = load_config(self.config_path)
         self.root = tk.Tk()
         self.root.title("Biscuit")
-        self.root.protocol("WM_DELETE_WINDOW", self.hide_toolbar)
+        self.root.protocol("WM_DELETE_WINDOW", self.show_settings)
         self.recorder = Recorder(sample_rate=self.config.sample_rate)
         self.hook = MouseHook(self.on_right_click)
+        self.tray = TrayController(
+            TrayCallbacks(
+                show_settings=lambda: self.root.after(0, self.show_settings),
+                dictate_at_cursor=lambda: self.root.after(0, self.begin_recording_from_cursor),
+                start_biscuit=lambda: self.root.after(0, self.start_biscuit),
+                stop_biscuit=lambda: self.root.after(0, self.kill_biscuit),
+                quit_app=lambda: self.root.after(0, self.quit_app),
+            )
+        )
+        tray_available = self.tray.start()
         callbacks = SettingsCallbacks(
             on_save=self.save_settings,
             on_start=self.start_biscuit,
             on_kill=self.kill_biscuit,
             on_update=self.update_model_state,
         )
-        self.overlay = BiscuitOverlay(self.root, self.config, callbacks)
+        self.overlay = BiscuitOverlay(self.root, self.config, callbacks, show_fallback_toolbar=not tray_available)
         self.last_context: RightClickContext | None = None
 
     def run(self) -> None:
         self.start_biscuit()
         self.root.mainloop()
 
-    def hide_toolbar(self) -> None:
-        self.root.withdraw()
+    def show_settings(self) -> None:
+        self.root.deiconify()
+        self.overlay.show_settings()
+
+    def quit_app(self) -> None:
+        self.kill_biscuit()
+        self.tray.stop()
+        self.root.destroy()
 
     def start_biscuit(self) -> None:
         self.hook.start()
@@ -85,6 +102,9 @@ class BiscuitApp:
             self.overlay.set_recording_status("recording")
         except Exception as exc:
             self.overlay.set_recording_status(f"microphone error: {exc}")
+
+    def begin_recording_from_cursor(self) -> None:
+        self.begin_recording(get_foreground_context())
 
     def stop_recording(self) -> None:
         self.overlay.set_recording_status("processing")

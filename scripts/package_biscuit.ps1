@@ -23,6 +23,10 @@ if (-not $pyinstallerPath) {
     --windowed `
     --name Biscuit `
     --paths src `
+    --hidden-import pystray `
+    --hidden-import pystray._win32 `
+    --hidden-import PIL.Image `
+    --hidden-import PIL.ImageDraw `
     --exclude-module torch `
     --exclude-module torchvision `
     --exclude-module torchaudio `

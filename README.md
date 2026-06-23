@@ -6,7 +6,7 @@ The first build is intentionally lean:
 
 - Python/Win32 source tool.
 - Tiny topmost right-click overlay instead of fragile per-app menu injection.
-- Floating `biscuit` toolbar button for settings.
+- Tiny Biscuit tray/menu-bar icon for settings and cursor dictation, with a floating `biscuit` fallback button if tray support is missing.
 - Local model path configuration.
 - No model blobs copied into this repository.
 
@@ -29,6 +29,21 @@ Linux and macOS users may need to mark the launcher executable after checkout:
 ```bash
 chmod +x launchers/biscuit-linux.sh launchers/Biscuit-macOS.command
 ```
+
+## Install-Style Setup
+
+Use the installer script for the current desktop to make Biscuit feel like a normal app launcher:
+
+```powershell
+.\scripts\install_windows.ps1
+```
+
+```bash
+./scripts/install_linux.sh
+./scripts/install_macos.sh
+```
+
+Windows creates a Start Menu shortcut. Linux creates a `biscuit.desktop` application entry. macOS creates `~/Applications/Biscuit.app`. At runtime Biscuit tries to show a tiny blue-black/yellow Biscuit icon in the system tray or menu bar; if tray support is not available, it shows the small themed floating Biscuit button.
 
 The settings panel has:
 
