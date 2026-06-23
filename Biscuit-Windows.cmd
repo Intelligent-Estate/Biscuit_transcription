@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "SCRIPT_DIR=%~dp0..\\"
+set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%" >nul
 
 set "PYTHONPATH=%SCRIPT_DIR%src"

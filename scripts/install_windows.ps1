@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$launcher = Join-Path $repo "launchers\Biscuit-Windows.cmd"
+$launcher = Join-Path $repo "Biscuit-Windows.cmd"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $shortcutPath = Join-Path $startMenu "Biscuit.lnk"
 

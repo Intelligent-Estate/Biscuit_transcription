@@ -20,14 +20,14 @@ The first build is intentionally lean:
 
 Double-click or run the launcher for the current desktop:
 
-- Windows: `launchers\Biscuit-Windows.cmd`
-- Linux: `launchers/biscuit-linux.sh`
-- macOS: `launchers/Biscuit-macOS.command`
+- Windows: `Biscuit-Windows.cmd`
+- Linux: `biscuit-linux.sh`
+- macOS: `Biscuit-macOS.command`
 
 Linux and macOS users may need to mark the launcher executable after checkout:
 
 ```bash
-chmod +x launchers/biscuit-linux.sh launchers/Biscuit-macOS.command
+chmod +x biscuit-linux.sh Biscuit-macOS.command
 ```
 
 ## Install-Style Setup

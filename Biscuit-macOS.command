@@ -8,8 +8,7 @@ while [ -L "$SCRIPT_PATH" ]; do
   [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$LINK_DIR/$SCRIPT_PATH"
 done
 
-LAUNCHER_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-APP_DIR="$(cd -- "$LAUNCHER_DIR/.." && pwd)"
+APP_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 
 cd "$APP_DIR"
 export PYTHONPATH="$APP_DIR/src"

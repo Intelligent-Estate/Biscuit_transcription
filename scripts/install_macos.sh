@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-LAUNCHER="$APP_DIR/launchers/Biscuit-macOS.command"
+LAUNCHER="$APP_DIR/Biscuit-macOS.command"
 BUNDLE="$HOME/Applications/Biscuit.app"
 MACOS_DIR="$BUNDLE/Contents/MacOS"
 RESOURCES_DIR="$BUNDLE/Contents/Resources"
