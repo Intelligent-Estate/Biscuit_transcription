@@ -16,6 +16,20 @@ The first build is intentionally lean:
 .\scripts\run_biscuit.ps1
 ```
 
+## Launchers
+
+Double-click or run the launcher for the current desktop:
+
+- Windows: `launchers\Biscuit-Windows.cmd`
+- Linux: `launchers/biscuit-linux.sh`
+- macOS: `launchers/Biscuit-macOS.command`
+
+Linux and macOS users may need to mark the launcher executable after checkout:
+
+```bash
+chmod +x launchers/biscuit-linux.sh launchers/Biscuit-macOS.command
+```
+
 The settings panel has:
 
 - Model
