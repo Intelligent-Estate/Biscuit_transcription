@@ -79,7 +79,7 @@ class BiscuitApp:
     def begin_recording(self, context: RightClickContext) -> None:
         self.last_context = context
         send_escape()
-        self.overlay.show_recording(self.stop_recording)
+        self.overlay.show_recording(context, self.stop_recording)
         try:
             self.recorder.start()
             self.overlay.set_recording_status("recording")

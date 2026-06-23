@@ -20,6 +20,24 @@ RED = "#ff4d5e"
 GREEN = "#55d488"
 TEXT = "#edf4ff"
 MUTED = "#8ea0b8"
+RECORDING_PILL_WIDTH = 230
+RECORDING_PILL_HEIGHT = 76
+RECORDING_PILL_OFFSET_Y = 28
+
+
+def recording_pill_position(
+    cursor_x: int,
+    cursor_y: int,
+    screen_width: int | None = None,
+    screen_height: int | None = None,
+) -> tuple[int, int]:
+    x = cursor_x
+    y = cursor_y + RECORDING_PILL_OFFSET_Y
+    if screen_width is not None:
+        x = min(max(0, x), max(0, screen_width - RECORDING_PILL_WIDTH))
+    if screen_height is not None:
+        y = min(max(0, y), max(0, screen_height - RECORDING_PILL_HEIGHT))
+    return x, y
 
 
 @dataclass(slots=True)
@@ -71,28 +89,45 @@ class BiscuitOverlay:
         button.pack(fill=tk.BOTH, expand=True, padx=0, pady=(4, 0))
         window.after(4500, self.close_action)
 
-    def show_recording(self, on_stop: Callable[[], None]) -> None:
+    def show_recording(self, context: RightClickContext, on_stop: Callable[[], None]) -> None:
         self.close_recording()
         window = tk.Toplevel(self.root)
         window.overrideredirect(True)
         window.attributes("-topmost", True)
         window.configure(bg=YELLOW)
-        window.geometry("+60+60")
+        x, y = recording_pill_position(
+            context.x,
+            context.y,
+            screen_width=self.root.winfo_screenwidth(),
+            screen_height=self.root.winfo_screenheight(),
+        )
+        window.geometry(f"{RECORDING_PILL_WIDTH}x{RECORDING_PILL_HEIGHT}+{x}+{y}")
         self.recording_window = window
         self.recording_status = tk.StringVar(value="recording")
+        stopped = {"value": False}
+
+        def request_stop(event=None):
+            del event
+            if stopped["value"]:
+                return "break"
+            stopped["value"] = True
+            on_stop()
+            return "break"
 
         frame = tk.Frame(window, bg=BLUE_BLACK, padx=12, pady=10)
         frame.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
-        tk.Label(frame, text="BISCUIT", fg=YELLOW, bg=BLUE_BLACK, font=("Segoe UI", 9, "bold")).grid(
+        title = tk.Label(frame, text="BISCUIT", fg=YELLOW, bg=BLUE_BLACK, font=("Segoe UI", 9, "bold"))
+        title.grid(
             row=0, column=0, sticky="w"
         )
-        tk.Label(frame, textvariable=self.recording_status, fg=TEXT, bg=BLUE_BLACK).grid(
+        status = tk.Label(frame, textvariable=self.recording_status, fg=TEXT, bg=BLUE_BLACK)
+        status.grid(
             row=1, column=0, sticky="w", pady=(2, 0)
         )
-        tk.Button(
+        stop_button = tk.Button(
             frame,
             text="Stop",
-            command=on_stop,
+            command=request_stop,
             bg=RED,
             fg="#ffffff",
             activebackground="#d63a49",
@@ -100,7 +135,10 @@ class BiscuitOverlay:
             relief=tk.FLAT,
             padx=12,
             pady=4,
-        ).grid(row=0, column=1, rowspan=2, padx=(18, 0))
+        )
+        stop_button.grid(row=0, column=1, rowspan=2, padx=(18, 0))
+        for widget in (window, frame, title, status, stop_button):
+            widget.bind("<ButtonRelease-1>", request_stop)
 
     def set_recording_status(self, status: str) -> None:
         if self.recording_status:
