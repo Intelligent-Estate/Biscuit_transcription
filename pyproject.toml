@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biscuit-transcription"
+version = "0.1.0"
+description = "Windows-first dictation overlay with local transcription support."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "faster-whisper",
+    "numpy",
+    "pillow",
+    "pyaudio",
+    "pystray",
+    "sounddevice",
+]
+
+[project.scripts]
+biscuit = "biscuit.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
