@@ -3,26 +3,160 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 from typing import Callable
 
 from .config import BiscuitConfig
-from .desktop import RightClickContext
+from .desktop import RightClickContext, raise_overlay_window
+from .status import DictationOutcome, DictationResult, status_text
 
 
 BLUE_BLACK = "#07111f"
 GUNMETAL = "#101b2d"
 PANEL = "#17243a"
+PANEL_DEEP = "#0d192b"
 YELLOW = "#ffd23f"
 CYAN = "#60d7ff"
 RED = "#ff4d5e"
 GREEN = "#55d488"
-TEXT = "#edf4ff"
+TEXT = "#f4fbff"
+ACCENT_TEXT = BLUE_BLACK
+SURFACE_WHITE = "#ffffff"
+EDGE_WHITE = "#dff7ff"
+TRANSPARENT_KEY = "#ff00fe"
 MUTED = "#8ea0b8"
+MENU_BG = BLUE_BLACK
+MENU_HOVER = PANEL
+MENU_TEXT = TEXT
+UI_FONT_FAMILY = "Courier New"
+UI_FONT = (UI_FONT_FAMILY, 9)
+UI_FONT_BOLD = (UI_FONT_FAMILY, 9, "bold")
+UI_FONT_TITLE = (UI_FONT_FAMILY, 18, "bold")
+ACTION_MENU_WIDTH = 220
+ACTION_MENU_HEIGHT = 30
 RECORDING_PILL_WIDTH = 230
 RECORDING_PILL_HEIGHT = 76
 RECORDING_PILL_OFFSET_Y = 28
+SETTINGS_WINDOW_GEOMETRY = "680x430+120+120"
+SETTINGS_WINDOW_MINSIZE = (640, 400)
+CORNER_RADIUS_ACTION = 12
+CORNER_RADIUS_PANEL = 18
+FLOATING_INSET = 4
+SETTINGS_ACTION_LABELS = {
+    "update": "Find Model",
+    "start": "Start Biscuit",
+    "stop": "Quit Biscuit",
+    "save": "Save",
+}
+RUNNING_DOG_FRAMES = ("\\(o.o)/", "/(o.o)\\")
+FINISHED_RECORDING_STATUSES = {
+    status_text(DictationOutcome(DictationResult.COPIED)),
+    status_text(DictationOutcome(DictationResult.INSERTED)),
+    status_text(DictationOutcome(DictationResult.NO_SPEECH)),
+}
+FINISHED_RECORDING_PREFIXES = (
+    "microphone unavailable",
+    "model unavailable",
+    "transcription failed",
+    "target unavailable",
+)
+
+
+def text_color_for_background(background: str) -> str:
+    hex_color = background.lstrip("#")
+    if len(hex_color) != 6:
+        return TEXT
+    red = int(hex_color[0:2], 16)
+    green = int(hex_color[2:4], 16)
+    blue = int(hex_color[4:6], 16)
+    luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
+    return TEXT if luminance < 0.42 else ACCENT_TEXT
+
+
+def rounded_rect_points(x1: int, y1: int, x2: int, y2: int, radius: int) -> list[tuple[int, int]]:
+    radius = max(0, min(radius, (x2 - x1) // 2, (y2 - y1) // 2))
+    return [
+        (x1 + radius, y1),
+        (x2 - radius, y1),
+        (x2, y1),
+        (x2, y1 + radius),
+        (x2, y2 - radius),
+        (x2, y2),
+        (x2 - radius, y2),
+        (x1 + radius, y2),
+        (x1, y2),
+        (x1, y2 - radius),
+        (x1, y1 + radius),
+    ]
+
+
+def _flat_points(points: list[tuple[int, int]]) -> list[int]:
+    return [coordinate for point in points for coordinate in point]
+
+
+def _draw_rounded_rect(
+    canvas: tk.Canvas,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    radius: int,
+    *,
+    fill: str,
+    outline: str | None = None,
+    width: int = 1,
+) -> int:
+    return canvas.create_polygon(
+        _flat_points(rounded_rect_points(x1, y1, x2, y2, radius)),
+        smooth=True,
+        fill=fill,
+        outline=outline or fill,
+        width=width,
+    )
+
+
+def _enable_transparent_edges(window: tk.Toplevel, fallback_bg: str = BLUE_BLACK) -> bool:
+    window.configure(bg=TRANSPARENT_KEY)
+    try:
+        window.attributes("-transparentcolor", TRANSPARENT_KEY)
+        return True
+    except tk.TclError:
+        window.configure(bg=fallback_bg)
+        return False
+
+
+def biscuit_icon_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "assets" / "Biscuit.ico"
+
+
+def apply_biscuit_icon(window: tk.Misc, icon_path: Path | None = None) -> bool:
+    path = icon_path or biscuit_icon_path()
+    if not path.exists():
+        return False
+    try:
+        window.iconbitmap(str(path))
+        return True
+    except (OSError, tk.TclError):
+        return False
+
+
+def action_menu_position(
+    cursor_x: int,
+    cursor_y: int,
+    screen_width: int | None = None,
+    screen_height: int | None = None,
+) -> tuple[int, int]:
+    x = cursor_x
+    y = cursor_y - ACTION_MENU_HEIGHT
+    if screen_width is not None:
+        x = min(max(0, x), max(0, screen_width - ACTION_MENU_WIDTH))
+    if screen_height is not None:
+        y = min(max(0, y), max(0, screen_height - ACTION_MENU_HEIGHT))
+    else:
+        y = max(0, y)
+    return x, y
 
 
 def recording_pill_position(
@@ -48,6 +182,47 @@ class SettingsCallbacks:
     on_update: Callable[[], str]
 
 
+@dataclass(frozen=True, slots=True)
+class RecordingControlState:
+    text: str
+    spinner: str
+    tk_state: str
+    bg: str
+    fg: str
+    active_bg: str
+
+
+def recording_control_state(status: str, tick: int = 0) -> RecordingControlState:
+    if status == "processing":
+        spinner = RUNNING_DOG_FRAMES[tick % len(RUNNING_DOG_FRAMES)]
+        return RecordingControlState(
+            text=f"run biscuit, run\n{spinner}",
+            spinner=spinner,
+            tk_state=tk.DISABLED,
+            bg=GUNMETAL,
+            fg=TEXT,
+            active_bg=GUNMETAL,
+        )
+    if status in FINISHED_RECORDING_STATUSES or status.startswith(FINISHED_RECORDING_PREFIXES):
+        spinner = RUNNING_DOG_FRAMES[tick % len(RUNNING_DOG_FRAMES)]
+        return RecordingControlState(
+            text=f"good biscuit\n{spinner}",
+            spinner=spinner,
+            tk_state=tk.DISABLED,
+            bg=GREEN,
+            fg=text_color_for_background(GREEN),
+            active_bg=GREEN,
+        )
+    return RecordingControlState(
+        text="Stop",
+        spinner="",
+        tk_state=tk.NORMAL,
+        bg=RED,
+        fg=text_color_for_background(RED),
+        active_bg="#d63a49",
+    )
+
+
 class BiscuitOverlay:
     def __init__(
         self,
@@ -59,10 +234,15 @@ class BiscuitOverlay:
         self.root = root
         self.config = config
         self.settings_callbacks = settings_callbacks
+        self.show_fallback_toolbar = show_fallback_toolbar
         self.action_window: tk.Toplevel | None = None
         self.recording_window: tk.Toplevel | None = None
         self.settings_window: tk.Toplevel | None = None
         self.recording_status: tk.StringVar | None = None
+        self.recording_control_text: tk.StringVar | None = None
+        self.recording_control_button: tk.Button | None = None
+        self._recording_control_tick = 0
+        self._recording_control_after: str | None = None
         self.settings_status: tk.StringVar | None = None
         self.model_var = tk.StringVar(value=config.model_path)
         self.language_var = tk.StringVar(value=config.language)
@@ -77,33 +257,85 @@ class BiscuitOverlay:
         window = tk.Toplevel(self.root)
         window.overrideredirect(True)
         window.attributes("-topmost", True)
-        window.configure(bg=YELLOW)
-        window.geometry(f"150x38+{context.x + 8}+{context.y + 8}")
+        try:
+            window.attributes("-toolwindow", True)
+        except tk.TclError:
+            pass
+        has_transparent_edges = _enable_transparent_edges(window, MENU_BG)
+        x, y = action_menu_position(
+            context.x,
+            context.y,
+            screen_width=self.root.winfo_screenwidth(),
+            screen_height=self.root.winfo_screenheight(),
+        )
+        window.geometry(f"{ACTION_MENU_WIDTH}x{ACTION_MENU_HEIGHT}+{x}+{y}")
         self.action_window = window
 
+        canvas = tk.Canvas(
+            window,
+            width=ACTION_MENU_WIDTH,
+            height=ACTION_MENU_HEIGHT,
+            bg=TRANSPARENT_KEY if has_transparent_edges else MENU_BG,
+            highlightthickness=0,
+            bd=0,
+        )
+        canvas.pack(fill=tk.BOTH, expand=True)
+        _draw_rounded_rect(
+            canvas,
+            0,
+            0,
+            ACTION_MENU_WIDTH - 1,
+            ACTION_MENU_HEIGHT - 1,
+            CORNER_RADIUS_ACTION,
+            fill=MENU_BG,
+            outline=EDGE_WHITE,
+        )
+        canvas.create_rectangle(0, 0, 7, ACTION_MENU_HEIGHT, fill=YELLOW, outline=YELLOW)
         button = tk.Button(
             window,
-            text="\U0001f399 biscuit",
+            text="\U0001f399  Biscuit",
             command=lambda: self._activate_action(context, on_biscuit),
-            bg=BLUE_BLACK,
-            fg=TEXT,
-            activebackground=PANEL,
-            activeforeground=YELLOW,
+            bg=MENU_BG,
+            fg=MENU_TEXT,
+            activebackground=MENU_HOVER,
+            activeforeground=MENU_TEXT,
             relief=tk.FLAT,
             bd=0,
-            padx=12,
-            pady=6,
-            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+            padx=22,
+            pady=0,
+            font=UI_FONT,
+            cursor="hand2",
         )
-        button.pack(fill=tk.BOTH, expand=True, padx=0, pady=(4, 0))
+        canvas.create_window(
+            FLOATING_INSET + 6,
+            FLOATING_INSET,
+            anchor="nw",
+            window=button,
+            width=ACTION_MENU_WIDTH - (FLOATING_INSET * 2) - 6,
+            height=ACTION_MENU_HEIGHT - (FLOATING_INSET * 2),
+        )
+        self._pin_action_window(window)
         window.after(4500, self.close_action)
+
+    def _pin_action_window(self, window: tk.Toplevel, remaining: int = 12) -> None:
+        if remaining <= 0 or self.action_window is not window:
+            return
+        try:
+            window.lift()
+            window.attributes("-topmost", True)
+            window.update_idletasks()
+            raise_overlay_window(int(window.winfo_id()))
+            window.after(50, lambda: self._pin_action_window(window, remaining - 1))
+        except tk.TclError:
+            return
 
     def show_recording(self, context: RightClickContext, on_stop: Callable[[], None]) -> None:
         self.close_recording()
         window = tk.Toplevel(self.root)
         window.overrideredirect(True)
         window.attributes("-topmost", True)
-        window.configure(bg=YELLOW)
+        has_transparent_edges = _enable_transparent_edges(window, YELLOW)
         x, y = recording_pill_position(
             context.x,
             context.y,
@@ -113,6 +345,7 @@ class BiscuitOverlay:
         window.geometry(f"{RECORDING_PILL_WIDTH}x{RECORDING_PILL_HEIGHT}+{x}+{y}")
         self.recording_window = window
         self.recording_status = tk.StringVar(value="recording")
+        self.recording_control_text = tk.StringVar(value=recording_control_state("recording").text)
         stopped = {"value": False}
 
         def request_stop(event=None):
@@ -123,35 +356,114 @@ class BiscuitOverlay:
             on_stop()
             return "break"
 
-        frame = tk.Frame(window, bg=BLUE_BLACK, padx=12, pady=10)
-        frame.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
-        title = tk.Label(frame, text="BISCUIT", fg=YELLOW, bg=BLUE_BLACK, font=("Segoe UI", 9, "bold"))
+        canvas = tk.Canvas(
+            window,
+            width=RECORDING_PILL_WIDTH,
+            height=RECORDING_PILL_HEIGHT,
+            bg=TRANSPARENT_KEY if has_transparent_edges else YELLOW,
+            highlightthickness=0,
+            bd=0,
+        )
+        canvas.pack(fill=tk.BOTH, expand=True)
+        _draw_rounded_rect(
+            canvas,
+            0,
+            0,
+            RECORDING_PILL_WIDTH - 1,
+            RECORDING_PILL_HEIGHT - 1,
+            CORNER_RADIUS_PANEL,
+            fill=YELLOW,
+            outline=EDGE_WHITE,
+        )
+        _draw_rounded_rect(
+            canvas,
+            FLOATING_INSET,
+            FLOATING_INSET,
+            RECORDING_PILL_WIDTH - FLOATING_INSET - 1,
+            RECORDING_PILL_HEIGHT - FLOATING_INSET - 1,
+            CORNER_RADIUS_PANEL - 4,
+            fill=BLUE_BLACK,
+            outline=CYAN,
+        )
+        frame = tk.Frame(canvas, bg=BLUE_BLACK, padx=12, pady=8)
+        canvas.create_window(
+            8,
+            8,
+            anchor="nw",
+            window=frame,
+            width=RECORDING_PILL_WIDTH - 16,
+            height=RECORDING_PILL_HEIGHT - 16,
+        )
+        title = tk.Label(frame, text="BISCUIT", fg=SURFACE_WHITE, bg=BLUE_BLACK, font=UI_FONT_BOLD)
         title.grid(
             row=0, column=0, sticky="w"
         )
-        status = tk.Label(frame, textvariable=self.recording_status, fg=TEXT, bg=BLUE_BLACK)
+        status = tk.Label(frame, textvariable=self.recording_status, fg=EDGE_WHITE, bg=BLUE_BLACK, font=UI_FONT)
         status.grid(
             row=1, column=0, sticky="w", pady=(2, 0)
         )
         stop_button = tk.Button(
             frame,
-            text="Stop",
+            textvariable=self.recording_control_text,
             command=request_stop,
             bg=RED,
-            fg="#ffffff",
+            fg=text_color_for_background(RED),
+            disabledforeground=text_color_for_background(RED),
             activebackground="#d63a49",
-            activeforeground="#ffffff",
+            activeforeground=text_color_for_background("#d63a49"),
             relief=tk.FLAT,
-            padx=12,
+            bd=0,
+            width=16,
+            padx=8,
             pady=4,
+            font=UI_FONT,
+            cursor="hand2",
         )
+        self.recording_control_button = stop_button
         stop_button.grid(row=0, column=1, rowspan=2, padx=(18, 0))
-        for widget in (window, frame, title, status, stop_button):
+        for widget in (window, canvas, frame, title, status, stop_button):
             widget.bind("<ButtonRelease-1>", request_stop)
+        self._render_recording_control("recording")
 
     def set_recording_status(self, status: str) -> None:
         if self.recording_status:
             self.recording_status.set(status)
+        self._render_recording_control(status)
+
+    def _render_recording_control(self, status: str) -> None:
+        if status == "processing":
+            self._animate_recording_control()
+            return
+        self._cancel_recording_control_animation()
+        state = recording_control_state(status)
+        self._apply_recording_control_state(state)
+
+    def _animate_recording_control(self) -> None:
+        state = recording_control_state("processing", self._recording_control_tick)
+        self._recording_control_tick += 1
+        self._apply_recording_control_state(state)
+        if self.recording_window:
+            self._recording_control_after = self.recording_window.after(140, self._animate_recording_control)
+
+    def _apply_recording_control_state(self, state: RecordingControlState) -> None:
+        if self.recording_control_text:
+            self.recording_control_text.set(state.text)
+        if self.recording_control_button:
+            self.recording_control_button.configure(
+                state=state.tk_state,
+                bg=state.bg,
+                fg=state.fg,
+                disabledforeground=state.fg,
+                activebackground=state.active_bg,
+            )
+
+    def _cancel_recording_control_animation(self) -> None:
+        if self._recording_control_after and self.recording_window:
+            try:
+                self.recording_window.after_cancel(self._recording_control_after)
+            except tk.TclError:
+                pass
+        self._recording_control_after = None
 
     def close_action(self) -> None:
         if self.action_window:
@@ -159,10 +471,13 @@ class BiscuitOverlay:
             self.action_window = None
 
     def close_recording(self) -> None:
+        self._cancel_recording_control_animation()
         if self.recording_window:
             self.recording_window.destroy()
             self.recording_window = None
             self.recording_status = None
+            self.recording_control_text = None
+            self.recording_control_button = None
 
     def show_settings(self) -> None:
         if self.settings_window and self.settings_window.winfo_exists():
@@ -172,49 +487,76 @@ class BiscuitOverlay:
 
         window = tk.Toplevel(self.root)
         window.title("Biscuit")
+        apply_biscuit_icon(window)
+        window.protocol("WM_DELETE_WINDOW", self.close_settings)
         window.attributes("-topmost", True)
-        window.configure(bg=BLUE_BLACK)
-        window.geometry("540x315+120+120")
-        window.minsize(500, 295)
+        window.configure(bg=BLUE_BLACK, highlightthickness=1, highlightbackground=EDGE_WHITE)
+        window.geometry(SETTINGS_WINDOW_GEOMETRY)
+        window.minsize(*SETTINGS_WINDOW_MINSIZE)
         self.settings_window = window
         self.settings_status = tk.StringVar(value="ready")
 
-        stripe = tk.Frame(window, height=5, bg=YELLOW)
+        stripe = tk.Frame(window, height=6, bg=YELLOW)
         stripe.pack(fill=tk.X, side=tk.TOP)
-        body = tk.Frame(window, bg=BLUE_BLACK, padx=18, pady=16)
+        glint = tk.Frame(window, height=1, bg=SURFACE_WHITE)
+        glint.pack(fill=tk.X, side=tk.TOP)
+        body = tk.Frame(window, bg=BLUE_BLACK, padx=28, pady=22)
         body.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(body, text="BISCUIT", fg=YELLOW, bg=BLUE_BLACK, font=("Segoe UI", 14, "bold")).grid(
-            row=0, column=0, columnspan=3, sticky="w", pady=(0, 14)
+        header = tk.Frame(body, bg=BLUE_BLACK)
+        header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 20))
+        tk.Label(header, text="Biscuit", fg=SURFACE_WHITE, bg=BLUE_BLACK, font=UI_FONT_TITLE).pack(
+            side=tk.LEFT
+        )
+        tk.Frame(header, bg=CYAN, height=2).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(18, 0), pady=(16, 0)
         )
 
-        self._label(body, "Model").grid(row=1, column=0, sticky="w", pady=6)
-        tk.Entry(body, textvariable=self.model_var, bg=PANEL, fg=TEXT, insertbackground=YELLOW, relief=tk.FLAT).grid(
-            row=1, column=1, sticky="ew", pady=6, ipady=5
+        self._label(body, "Model").grid(row=1, column=0, sticky="w", pady=7)
+        self._entry(body, self.model_var).grid(
+            row=1, column=1, sticky="ew", pady=7, ipady=6
         )
-        tk.Button(body, text="Browse", command=self._browse_model, bg=GUNMETAL, fg=TEXT, relief=tk.FLAT).grid(
-            row=1, column=2, sticky="ew", padx=(8, 0), pady=6
+        tk.Button(
+            body,
+            text="Browse",
+            command=self._browse_model,
+            bg=GUNMETAL,
+            fg=EDGE_WHITE,
+            activebackground=PANEL,
+            activeforeground=SURFACE_WHITE,
+            relief=tk.FLAT,
+            bd=0,
+            font=UI_FONT,
+            cursor="hand2",
+        ).grid(
+            row=1, column=2, sticky="ew", padx=(12, 0), pady=7, ipady=4
         )
 
-        self._label(body, "Language").grid(row=2, column=0, sticky="w", pady=6)
-        tk.Entry(body, textvariable=self.language_var, bg=PANEL, fg=TEXT, insertbackground=YELLOW, relief=tk.FLAT).grid(
-            row=2, column=1, sticky="ew", pady=6, ipady=5
+        self._label(body, "Language").grid(row=2, column=0, sticky="w", pady=7)
+        self._entry(body, self.language_var).grid(
+            row=2, column=1, sticky="ew", pady=7, ipady=6
         )
 
-        self._label(body, "Provider").grid(row=3, column=0, sticky="w", pady=6)
-        tk.Entry(body, textvariable=self.provider_var, bg=PANEL, fg=TEXT, insertbackground=YELLOW, relief=tk.FLAT).grid(
-            row=3, column=1, sticky="ew", pady=6, ipady=5
+        self._label(body, "Provider").grid(row=3, column=0, sticky="w", pady=7)
+        self._entry(body, self.provider_var).grid(
+            row=3, column=1, sticky="ew", pady=7, ipady=6
         )
 
         controls = tk.Frame(body, bg=BLUE_BLACK)
-        controls.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(14, 4))
-        self._button(controls, "Update", self._update).pack(side=tk.LEFT, padx=(0, 8))
-        self._button(controls, "Start Biscuit", self.settings_callbacks.on_start, GREEN).pack(side=tk.LEFT, padx=8)
-        self._button(controls, "Kill Biscuit", self.settings_callbacks.on_kill, RED).pack(side=tk.LEFT, padx=8)
-        self._button(controls, "Save", self._save, CYAN).pack(side=tk.RIGHT)
+        controls.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(18, 8))
+        self._button(controls, SETTINGS_ACTION_LABELS["update"], self._update).pack(side=tk.LEFT, padx=(0, 8))
+        self._button(controls, SETTINGS_ACTION_LABELS["start"], self.settings_callbacks.on_start, GREEN).pack(
+            side=tk.LEFT, padx=8
+        )
+        self._button(controls, SETTINGS_ACTION_LABELS["stop"], self.settings_callbacks.on_kill, RED).pack(
+            side=tk.LEFT, padx=8
+        )
+        self._button(controls, SETTINGS_ACTION_LABELS["save"], self._save, CYAN).pack(side=tk.RIGHT)
 
-        tk.Label(body, textvariable=self.settings_status, fg=MUTED, bg=BLUE_BLACK).grid(
-            row=5, column=0, columnspan=3, sticky="w", pady=(12, 0)
+        status_band = tk.Frame(body, bg=PANEL_DEEP, padx=14, pady=9, highlightthickness=1, highlightbackground=CYAN)
+        status_band.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        tk.Label(status_band, textvariable=self.settings_status, fg=EDGE_WHITE, bg=PANEL_DEEP, font=UI_FONT).pack(
+            side=tk.LEFT
         )
         body.columnconfigure(1, weight=1)
 
@@ -222,22 +564,30 @@ class BiscuitOverlay:
         if self.settings_status:
             self.settings_status.set(status)
 
+    def close_settings(self) -> None:
+        if self.settings_window:
+            self.settings_window.destroy()
+            self.settings_window = None
+        if self.show_fallback_toolbar:
+            self.root.withdraw()
+
     def _build_toolbar(self) -> None:
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.root.configure(bg=YELLOW)
+        self.root.configure(bg=YELLOW, highlightthickness=1, highlightbackground=EDGE_WHITE)
         self.root.geometry("92x34+24+24")
         button = tk.Button(
             self.root,
             text="biscuit",
             command=self.show_settings,
             bg=BLUE_BLACK,
-            fg=YELLOW,
+            fg=TEXT,
             activebackground=PANEL,
             activeforeground=TEXT,
             relief=tk.FLAT,
             bd=0,
-            font=("Segoe UI", 9, "bold"),
+            font=UI_FONT_BOLD,
+            cursor="hand2",
         )
         button.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
 
@@ -271,7 +621,21 @@ class BiscuitOverlay:
         self.set_settings_status(status)
 
     def _label(self, parent: tk.Misc, text: str) -> tk.Label:
-        return tk.Label(parent, text=text, fg=MUTED, bg=BLUE_BLACK, font=("Segoe UI", 9))
+        return tk.Label(parent, text=text, fg=EDGE_WHITE, bg=BLUE_BLACK, font=UI_FONT_BOLD)
+
+    def _entry(self, parent: tk.Misc, textvariable: tk.StringVar) -> tk.Entry:
+        return tk.Entry(
+            parent,
+            textvariable=textvariable,
+            bg=PANEL_DEEP,
+            fg=TEXT,
+            insertbackground=YELLOW,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=PANEL,
+            highlightcolor=CYAN,
+            font=UI_FONT,
+        )
 
     def _button(
         self,
@@ -285,10 +649,13 @@ class BiscuitOverlay:
             text=text,
             command=command,
             bg=bg,
-            fg="#ffffff" if bg in {RED, GREEN} else TEXT,
+            fg=text_color_for_background(bg),
             activebackground=GUNMETAL,
-            activeforeground=YELLOW,
+            activeforeground=TEXT,
             relief=tk.FLAT,
+            bd=0,
             padx=12,
             pady=6,
+            font=UI_FONT,
+            cursor="hand2",
         )
