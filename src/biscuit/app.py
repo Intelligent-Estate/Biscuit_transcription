@@ -103,6 +103,17 @@ def finish_dictation_result(recording, context, transcribe, insert, copy) -> Dic
     return DictationOutcome(DictationResult.INSERTED)
 
 
+def finish_test_dictation_result(recording, transcribe, insert=None, copy=None) -> tuple[DictationOutcome, str]:
+    del insert, copy
+    try:
+        text = transcribe(recording.path)
+    except TranscriptionError as exc:
+        return DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc)), ""
+    if not text:
+        return DictationOutcome(DictationResult.NO_SPEECH), ""
+    return DictationOutcome(DictationResult.INSERTED, "test complete"), text
+
+
 def is_hugging_face_model_id(source: str) -> bool:
     if "\\" in source or source.startswith(("/", ".")):
         return False
@@ -135,12 +146,13 @@ class BiscuitApp:
         tray_available = self.tray.start()
         callbacks = SettingsCallbacks(
             on_save=self.save_settings,
-            on_start=self.start_biscuit,
+            on_test=self.begin_test_recording,
             on_kill=self.kill_biscuit,
             on_update=self.update_model_state,
         )
         self.overlay = BiscuitOverlay(self.root, self.config, callbacks, show_fallback_toolbar=not tray_available)
         self.last_context: RightClickContext | None = None
+        self._test_recording = False
         self._request_socket: socket.socket | None = None
         self._request_thread: threading.Thread | None = None
         self._warmup_thread: threading.Thread | None = None
@@ -276,27 +288,46 @@ class BiscuitApp:
     def begin_recording_from_cursor(self) -> None:
         self.begin_recording(get_foreground_context())
 
+    def begin_test_recording(self) -> None:
+        self.last_context = None
+        self._test_recording = True
+        self.overlay.set_test_output("Recording test. Use the red Stop control when finished.")
+        self.begin_recording(get_foreground_context())
+
     def stop_recording(self) -> None:
         self.overlay.set_recording_status("processing")
         worker = threading.Thread(target=self._finish_recording, name="BiscuitTranscribe", daemon=True)
         worker.start()
 
     def _finish_recording(self) -> None:
+        test_recording = self._test_recording
+        self._test_recording = False
         try:
             recording = self.recorder.stop()
-            outcome = finish_dictation_result(
-                recording=recording,
-                context=self.last_context,
-                transcribe=self._transcribe,
-                insert=insert_text_into_context,
-                copy=self._copy_to_clipboard,
-            )
-            self._ui_status(status_text(outcome))
+            if test_recording:
+                outcome, transcript = finish_test_dictation_result(recording=recording, transcribe=self._transcribe)
+                self._ui_status(status_text(outcome))
+                self._ui_test_output(transcript or status_text(outcome))
+            else:
+                outcome = finish_dictation_result(
+                    recording=recording,
+                    context=self.last_context,
+                    transcribe=self._transcribe,
+                    insert=insert_text_into_context,
+                    copy=self._copy_to_clipboard,
+                )
+                self._ui_status(status_text(outcome))
         except RecordingError as exc:
-            self._ui_status(status_text(DictationOutcome(DictationResult.MICROPHONE_ERROR, str(exc))))
+            status = status_text(DictationOutcome(DictationResult.MICROPHONE_ERROR, str(exc)))
+            self._ui_status(status)
+            if test_recording:
+                self._ui_test_output(status)
             traceback.print_exc()
         except Exception as exc:
-            self._ui_status(status_text(DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc))))
+            status = status_text(DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc)))
+            self._ui_status(status)
+            if test_recording:
+                self._ui_test_output(status)
             traceback.print_exc()
         finally:
             self.root.after(900, self.overlay.close_recording)
@@ -341,6 +372,9 @@ class BiscuitApp:
 
     def _ui_status(self, status: str) -> None:
         self.root.after(0, lambda: self.overlay.set_recording_status(status))
+
+    def _ui_test_output(self, text: str) -> None:
+        self.root.after(0, lambda: self.overlay.set_test_output(text))
 
 
 def main(argv: Sequence[str] | None = None) -> None:

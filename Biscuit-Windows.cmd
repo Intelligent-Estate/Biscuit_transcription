@@ -5,8 +5,12 @@ set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%" >nul
 
 set "PYTHONPATH=%SCRIPT_DIR%src"
-python -m biscuit
+where pythonw.exe >nul 2>nul
+if "%ERRORLEVEL%"=="0" (
+    start "" /b pythonw.exe -m biscuit %*
+) else (
+    start "" /min python.exe -m biscuit %*
+)
 
-set "EXIT_CODE=%ERRORLEVEL%"
 popd >nul
-exit /b %EXIT_CODE%
+exit /b 0

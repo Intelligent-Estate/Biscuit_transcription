@@ -62,11 +62,11 @@ class TrayController:
             return False
 
         menu = pystray.Menu(
-            pystray.MenuItem("Biscuit Settings", lambda _icon, _item: self.callbacks.show_settings()),
+            pystray.MenuItem("Biscuit Settings", lambda _icon, _item: self.callbacks.show_settings(), default=True),
             pystray.MenuItem("Dictate at Cursor", lambda _icon, _item: self.callbacks.dictate_at_cursor()),
             pystray.MenuItem("Start Biscuit", lambda _icon, _item: self.callbacks.start_biscuit()),
-            pystray.MenuItem("Kill Biscuit", lambda _icon, _item: self.callbacks.stop_biscuit()),
-            pystray.MenuItem("Quit", lambda _icon, _item: self.callbacks.quit_app()),
+            pystray.MenuItem("Stop Biscuit", lambda _icon, _item: self.callbacks.stop_biscuit()),
+            pystray.MenuItem("Quit Biscuit", lambda _icon, _item: self.callbacks.quit_app()),
         )
         self._icon = pystray.Icon("Biscuit", build_tray_icon_image(), "Biscuit", menu)
         self._thread = threading.Thread(target=self._icon.run, name="BiscuitTray", daemon=True)

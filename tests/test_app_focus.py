@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from unittest.mock import patch
 
-from biscuit.app import finish_dictation_result, insert_text_into_context
+from biscuit.app import finish_dictation_result, finish_test_dictation_result, insert_text_into_context
 from biscuit.desktop import RightClickContext
 from biscuit.status import DictationResult
 from biscuit.transcription import TranscriptionError
@@ -93,6 +93,22 @@ class FinishDictationResultTests(unittest.TestCase):
         )
         self.assertEqual(outcome.result, DictationResult.TRANSCRIPTION_ERROR)
         self.assertEqual(outcome.detail, "model missing")
+
+    def test_finish_test_dictation_returns_transcript_without_insert_or_copy(self):
+        insert = Mock()
+        copy = Mock()
+
+        outcome, transcript = finish_test_dictation_result(
+            recording=SimpleNamespace(path=Path("sample.wav")),
+            transcribe=lambda _path: "field note",
+            insert=insert,
+            copy=copy,
+        )
+
+        self.assertEqual(outcome.result, DictationResult.INSERTED)
+        self.assertEqual(transcript, "field note")
+        insert.assert_not_called()
+        copy.assert_not_called()
 
 
 if __name__ == "__main__":

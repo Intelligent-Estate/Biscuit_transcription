@@ -12,6 +12,12 @@ import tempfile
 from .text import normalize_transcript
 
 
+try:  # pragma: no cover - optional backend import varies by install.
+    from faster_whisper import WhisperModel
+except Exception:  # pragma: no cover
+    WhisperModel = None
+
+
 class TranscriptionError(RuntimeError):
     """Raised when local transcription cannot complete."""
 
@@ -20,6 +26,9 @@ class TranscriptionError(RuntimeError):
 class ProviderChoice:
     name: str
     executable: str = ""
+
+
+_MODEL_CACHE: dict[tuple[str, str], object] = {}
 
 
 def build_external_command(
@@ -48,9 +57,10 @@ def build_external_command(
     ]
 
 
-def detect_provider(preferred: str = "auto", model_path: Path | None = None) -> ProviderChoice:
-    suffix = model_path.suffix.lower() if model_path else ""
+def detect_provider(preferred: str = "auto", model_path: str | Path | None = None) -> ProviderChoice:
+    suffix = Path(str(model_path)).suffix.lower() if model_path else ""
     needs_gguf_runner = suffix in {".gguf", ".bin"}
+    needs_whisper_loader = suffix == ".pt"
 
     if preferred and preferred != "auto":
         executable = shutil.which(preferred)
@@ -67,6 +77,10 @@ def detect_provider(preferred: str = "auto", model_path: Path | None = None) -> 
         if executable:
             return ProviderChoice(name="external", executable=executable)
 
+    if needs_whisper_loader and importlib.util.find_spec("whisper"):
+        return ProviderChoice(name="whisper")
+    if needs_whisper_loader:
+        raise TranscriptionError("PT models need the local whisper Python package.")
     if needs_gguf_runner:
         raise TranscriptionError("GGUF/GGML models need a whisper.cpp runner such as whisper-cli.exe.")
 
@@ -80,18 +94,40 @@ def detect_provider(preferred: str = "auto", model_path: Path | None = None) -> 
 
 def transcribe_audio(
     audio_path: Path,
-    model_path: Path,
+    model_path: str | Path,
     language: str = "en",
     provider: str = "auto",
 ) -> str:
     choice = detect_provider(provider, model_path)
+    model_source = Path(str(model_path))
     if choice.name == "external":
-        return _transcribe_external(choice, model_path, audio_path, language)
+        return _transcribe_external(choice, model_source, audio_path, language)
     if choice.name == "faster_whisper":
         return _transcribe_faster_whisper(model_path, audio_path, language)
     if choice.name == "whisper":
-        return _transcribe_whisper(model_path, audio_path, language)
+        return _transcribe_whisper(model_source, audio_path, language)
     raise TranscriptionError(f"Unsupported transcription provider: {choice.name}")
+
+
+def warm_transcription_model(model_path: str | Path, provider: str = "auto") -> None:
+    choice = detect_provider(provider, model_path)
+    if choice.name == "faster_whisper":
+        _get_faster_whisper_model(model_path)
+        return
+    if choice.name == "whisper":
+        _get_whisper_model(Path(str(model_path)))
+
+
+def _hidden_subprocess_options() -> dict[str, object]:
+    options: dict[str, object] = {}
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        options["creationflags"] = subprocess.CREATE_NO_WINDOW
+    if hasattr(subprocess, "STARTUPINFO"):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        options["startupinfo"] = startupinfo
+    return options
 
 
 def _transcribe_external(
@@ -110,6 +146,7 @@ def _transcribe_external(
             text=True,
             check=False,
             timeout=180,
+            **_hidden_subprocess_options(),
         )
         if result.returncode != 0:
             message = result.stderr.strip() or result.stdout.strip() or "transcription failed"
@@ -130,12 +167,7 @@ def _transcribe_external(
 
 
 def _transcribe_faster_whisper(model_path: Path, audio_path: Path, language: str) -> str:
-    try:
-        from faster_whisper import WhisperModel
-    except Exception as exc:  # pragma: no cover - backend availability varies.
-        raise TranscriptionError(str(exc)) from exc
-
-    model = WhisperModel(str(model_path), device="cpu", compute_type="int8")
+    model = _get_faster_whisper_model(model_path)
     segments, _info = model.transcribe(str(audio_path), language=language, vad_filter=True)
     return normalize_transcript(" ".join(segment.text for segment in segments))
 
@@ -146,6 +178,30 @@ def _transcribe_whisper(model_path: Path, audio_path: Path, language: str) -> st
     except Exception as exc:  # pragma: no cover - backend availability varies.
         raise TranscriptionError(str(exc)) from exc
 
-    model = whisper.load_model(str(model_path))
+    model = _get_whisper_model(model_path)
     result = model.transcribe(str(audio_path), language=language)
     return normalize_transcript(result.get("text", ""))
+
+
+def _get_faster_whisper_model(model_path: str | Path) -> object:
+    if WhisperModel is None:
+        raise TranscriptionError("faster-whisper is not installed.")
+
+    model_source = str(model_path).replace("\\", "/")
+    key = ("faster_whisper", model_source)
+    model = _MODEL_CACHE.get(key)
+    if model is None:
+        model = WhisperModel(model_source, device="cpu", compute_type="int8")
+        _MODEL_CACHE[key] = model
+    return model
+
+
+def _get_whisper_model(model_path: Path) -> object:
+    import whisper
+
+    key = ("whisper", str(model_path))
+    model = _MODEL_CACHE.get(key)
+    if model is None:
+        model = whisper.load_model(str(model_path))
+        _MODEL_CACHE[key] = model
+    return model

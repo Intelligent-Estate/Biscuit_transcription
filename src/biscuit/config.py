@@ -10,8 +10,11 @@ from typing import Iterable
 
 
 APP_NAME = "Biscuit"
-MODEL_EXTENSIONS = {".bin", ".gguf", ".onnx", ".pt", ".tflite"}
-DEFAULT_AI_BIO_ROOT = Path(r"C:\Users\marsh\Documents\ai bio")
+MODEL_EXTENSIONS = {".bin", ".gguf", ".pt"}
+SPEECH_MODEL_MARKERS = ("whisper", "ggml")
+DEFAULT_MODEL_SOURCE = "Systran/faster-whisper-tiny.en"
+DEFAULT_WHISPER_CACHE_ROOT = Path.home() / ".cache" / "whisper"
+DEFAULT_MODEL_ROOTS = (DEFAULT_WHISPER_CACHE_ROOT,)
 SKIP_DIRS = {
     ".git",
     ".hg",
@@ -45,8 +48,7 @@ def default_config_path() -> Path:
 def load_config(path: Path | None = None) -> BiscuitConfig:
     config_path = path or default_config_path()
     if not config_path.exists():
-        discovered = choose_best_model(discover_model_candidates())
-        return BiscuitConfig(model_path=str(discovered) if discovered else "")
+        return BiscuitConfig(model_path=DEFAULT_MODEL_SOURCE)
 
     with config_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -64,7 +66,13 @@ def save_config(path: Path | None, config: BiscuitConfig) -> None:
         handle.write("\n")
 
 
-def discover_model_candidates(root: Path = DEFAULT_AI_BIO_ROOT, max_depth: int = 6) -> list[Path]:
+def discover_model_candidates(root: Path | None = None, max_depth: int = 6) -> list[Path]:
+    if root is None:
+        candidates: list[Path] = []
+        for model_root in DEFAULT_MODEL_ROOTS:
+            candidates.extend(discover_model_candidates(model_root, max_depth=max_depth))
+        return candidates
+
     if not root.exists():
         return []
 
@@ -85,14 +93,14 @@ def discover_model_candidates(root: Path = DEFAULT_AI_BIO_ROOT, max_depth: int =
 
         for filename in files:
             path = current_path / filename
-            if path.suffix.lower() in MODEL_EXTENSIONS:
+            if is_supported_model_path(path):
                 candidates.append(path)
 
     return candidates
 
 
 def choose_best_model(paths: Iterable[Path]) -> Path | None:
-    existing = [path for path in paths if path.exists()]
+    existing = [path for path in paths if path.exists() and is_supported_model_path(path)]
     if not existing:
         return None
 
@@ -104,3 +112,13 @@ def choose_best_model(paths: Iterable[Path]) -> Path | None:
         return (tiny_bonus, quant_bonus, size, name)
 
     return sorted(existing, key=score)[0]
+
+
+def is_supported_model_path(path: Path) -> bool:
+    suffix = path.suffix.lower()
+    if suffix not in MODEL_EXTENSIONS:
+        return False
+    if suffix == ".pt":
+        return True
+    lowered = path.as_posix().lower()
+    return any(marker in lowered for marker in SPEECH_MODEL_MARKERS)

@@ -21,6 +21,8 @@ if os.name == "nt":
     from .win32_api import (  # noqa: F401
         MouseHook,
         get_foreground_context,
+        raise_overlay_window,
+        restore_input_focus,
         send_escape,
         send_unicode_text,
     )
@@ -50,6 +52,16 @@ else:
 
 
     def send_escape() -> None:
+        return None
+
+
+    def restore_input_focus(context: RightClickContext) -> None:
+        del context
+        return None
+
+
+    def raise_overlay_window(hwnd: int) -> None:
+        del hwnd
         return None
 
 

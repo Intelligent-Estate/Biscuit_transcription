@@ -39,15 +39,15 @@ ACTION_MENU_HEIGHT = 30
 RECORDING_PILL_WIDTH = 230
 RECORDING_PILL_HEIGHT = 76
 RECORDING_PILL_OFFSET_Y = 28
-SETTINGS_WINDOW_GEOMETRY = "680x430+120+120"
-SETTINGS_WINDOW_MINSIZE = (640, 400)
+SETTINGS_WINDOW_GEOMETRY = "680x540+120+120"
+SETTINGS_WINDOW_MINSIZE = (640, 500)
 CORNER_RADIUS_ACTION = 12
 CORNER_RADIUS_PANEL = 18
 FLOATING_INSET = 4
 SETTINGS_ACTION_LABELS = {
     "update": "Find Model",
-    "start": "Start Biscuit",
-    "stop": "Quit Biscuit",
+    "test": "Test Biscuit",
+    "stop": "Stop Biscuit",
     "save": "Save",
 }
 RUNNING_DOG_FRAMES = ("\\(o.o)/", "/(o.o)\\")
@@ -177,7 +177,7 @@ def recording_pill_position(
 @dataclass(slots=True)
 class SettingsCallbacks:
     on_save: Callable[[BiscuitConfig], None]
-    on_start: Callable[[], None]
+    on_test: Callable[[], None]
     on_kill: Callable[[], None]
     on_update: Callable[[], str]
 
@@ -244,6 +244,7 @@ class BiscuitOverlay:
         self._recording_control_tick = 0
         self._recording_control_after: str | None = None
         self.settings_status: tk.StringVar | None = None
+        self.test_output: tk.StringVar | None = None
         self.model_var = tk.StringVar(value=config.model_path)
         self.language_var = tk.StringVar(value=config.language)
         self.provider_var = tk.StringVar(value=config.provider)
@@ -495,6 +496,7 @@ class BiscuitOverlay:
         window.minsize(*SETTINGS_WINDOW_MINSIZE)
         self.settings_window = window
         self.settings_status = tk.StringVar(value="ready")
+        self.test_output = tk.StringVar(value="Test transcript will appear here.")
 
         stripe = tk.Frame(window, height=6, bg=YELLOW)
         stripe.pack(fill=tk.X, side=tk.TOP)
@@ -545,7 +547,7 @@ class BiscuitOverlay:
         controls = tk.Frame(body, bg=BLUE_BLACK)
         controls.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(18, 8))
         self._button(controls, SETTINGS_ACTION_LABELS["update"], self._update).pack(side=tk.LEFT, padx=(0, 8))
-        self._button(controls, SETTINGS_ACTION_LABELS["start"], self.settings_callbacks.on_start, GREEN).pack(
+        self._button(controls, SETTINGS_ACTION_LABELS["test"], self._test, GREEN).pack(
             side=tk.LEFT, padx=8
         )
         self._button(controls, SETTINGS_ACTION_LABELS["stop"], self.settings_callbacks.on_kill, RED).pack(
@@ -558,11 +560,29 @@ class BiscuitOverlay:
         tk.Label(status_band, textvariable=self.settings_status, fg=EDGE_WHITE, bg=PANEL_DEEP, font=UI_FONT).pack(
             side=tk.LEFT
         )
+
+        test_panel = tk.Frame(body, bg=PANEL_DEEP, padx=14, pady=10, highlightthickness=1, highlightbackground=PANEL)
+        test_panel.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(12, 0))
+        tk.Label(
+            test_panel,
+            textvariable=self.test_output,
+            fg=TEXT,
+            bg=PANEL_DEEP,
+            font=UI_FONT,
+            justify=tk.LEFT,
+            anchor="nw",
+            wraplength=600,
+        ).pack(fill=tk.BOTH, expand=True)
         body.columnconfigure(1, weight=1)
+        body.rowconfigure(6, weight=1)
 
     def set_settings_status(self, status: str) -> None:
         if self.settings_status:
             self.settings_status.set(status)
+
+    def set_test_output(self, text: str) -> None:
+        if self.test_output:
+            self.test_output.set(text)
 
     def close_settings(self) -> None:
         if self.settings_window:
@@ -607,11 +627,18 @@ class BiscuitOverlay:
             self.model_var.set(path)
 
     def _save(self) -> None:
+        self._apply_visible_settings()
+        self.settings_callbacks.on_save(self.config)
+        self.set_settings_status("saved")
+
+    def _test(self) -> None:
+        self._apply_visible_settings()
+        self.settings_callbacks.on_test()
+
+    def _apply_visible_settings(self) -> None:
         self.config.model_path = self.model_var.get().strip()
         self.config.language = self.language_var.get().strip() or "en"
         self.config.provider = self.provider_var.get().strip() or "auto"
-        self.settings_callbacks.on_save(self.config)
-        self.set_settings_status("saved")
 
     def _update(self) -> None:
         status = self.settings_callbacks.on_update()

@@ -1,8 +1,8 @@
 # Biscuit
 
-Biscuit is a Windows-first dictation overlay. Right-click anywhere, choose the small `biscuit` action, speak, stop recording, and Biscuit inserts the transcribed text back into the clicked window.
-
 ![How Biscuit Runs](docs/biscuit-ontology.svg)
+
+Biscuit is a Windows-first dictation overlay. Right-click anywhere, choose the small `biscuit` action, speak, stop recording, and Biscuit inserts the transcribed text back into the clicked window.
 
 For a simple trust-focused map of the moving parts, see [Biscuit Ontology](docs/biscuit-ontology.md).
 
@@ -83,11 +83,14 @@ The settings panel has:
 - Language
 - Provider
 - Find Model
-- Start Biscuit
-- Quit Biscuit
+- Test Biscuit
+- Stop Biscuit
 - Save
+- Test transcript panel
 
 `Find Model` searches common local cache locations for supported speech model files. The default config uses the hosted faster-whisper model above, so a new checkout can run without any private paths. Use Browse only when you want to point Biscuit at your own local model file.
+
+`Test Biscuit` records a sample and shows the resulting transcript in the settings panel without typing into another app. `Stop Biscuit` stops Biscuit's active listener and closes active overlay controls.
 
 For GGUF/GGML models, set Provider to a GGUF-capable runner such as `whisper-cli.exe` when it is available on the machine. Leave Provider as `auto` for the hosted faster-whisper source, Python-backed local model directories, or model names.
 

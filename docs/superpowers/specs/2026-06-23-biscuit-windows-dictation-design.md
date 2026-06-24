@@ -54,7 +54,7 @@ Biscuit must not import large objects into this repository.
 Model resolution order:
 
 1. User-configured `model_path` in `config/biscuit.json`.
-2. A discovered model under `C:\Users\marsh\Documents\ai bio`.
+2. A public default speech model source from Hugging Face, with optional local model overrides.
 3. A small known local model name if a Python transcription package can resolve it from existing cache.
 4. A clear settings warning asking for a model path.
 

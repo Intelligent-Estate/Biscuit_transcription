@@ -7,10 +7,9 @@ Set-Location $repo
 $pyinstallerCommand = Get-Command pyinstaller -ErrorAction SilentlyContinue
 $pyinstallerPath = if ($pyinstallerCommand) { $pyinstallerCommand.Source } else { "" }
 if (-not $pyinstallerPath) {
-    $fallback = "C:\Users\marsh\Downloads\roop-unleashed-main\roop-unleashed-main\installer\installer_files\env\Scripts\pyinstaller.exe"
-    if (Test-Path $fallback) {
-        $pyinstallerPath = $fallback
-    }
+    python -m pip install pyinstaller
+    $pyinstallerCommand = Get-Command pyinstaller -ErrorAction SilentlyContinue
+    $pyinstallerPath = if ($pyinstallerCommand) { $pyinstallerCommand.Source } else { "" }
 }
 
 if (-not $pyinstallerPath) {

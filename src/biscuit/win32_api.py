@@ -31,9 +31,17 @@ WM_QUIT = 0x0012
 WM_RBUTTONUP = 0x0205
 WM_RBUTTONDOWN = 0x0204
 INPUT_KEYBOARD = 1
+INPUT_MOUSE = 0
 KEYEVENTF_KEYUP = 0x0002
 KEYEVENTF_UNICODE = 0x0004
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
 VK_ESCAPE = 0x1B
+HWND_TOPMOST = HWND(-1)
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
+SWP_SHOWWINDOW = 0x0040
 ULONG_PTR = c_ulonglong if sizeof(c_void_p) == 8 else c_ulong
 LRESULT = c_long if sizeof(c_void_p) == 4 else c_longlong
 
@@ -62,8 +70,19 @@ class KBDINPUT(Structure):
     ]
 
 
+class MOUSEINPUT(Structure):
+    _fields_ = [
+        ("dx", c_long),
+        ("dy", c_long),
+        ("mouseData", c_ulong),
+        ("dwFlags", c_ulong),
+        ("time", c_ulong),
+        ("dwExtraInfo", ULONG_PTR),
+    ]
+
+
 class INPUTUNION(Union):
-    _fields_ = [("ki", KBDINPUT)]
+    _fields_ = [("ki", KBDINPUT), ("mi", MOUSEINPUT)]
 
 
 class INPUT(Structure):
@@ -89,10 +108,14 @@ kernel32 = windll.kernel32
 user32.GetForegroundWindow.restype = HWND
 user32.SetForegroundWindow.argtypes = [HWND]
 user32.SetForegroundWindow.restype = BOOL
+user32.SetWindowPos.argtypes = [HWND, HWND, c_int, c_int, c_int, c_int, UINT]
+user32.SetWindowPos.restype = BOOL
 user32.WindowFromPoint.argtypes = [POINT]
 user32.WindowFromPoint.restype = HWND
 user32.GetCursorPos.argtypes = [POINTER(POINT)]
 user32.GetCursorPos.restype = BOOL
+user32.SetCursorPos.argtypes = [c_int, c_int]
+user32.SetCursorPos.restype = BOOL
 user32.GetWindowTextLengthW.argtypes = [HWND]
 user32.GetWindowTextLengthW.restype = c_int
 user32.GetWindowTextW.restype = c_int
@@ -164,8 +187,31 @@ def set_foreground_window(hwnd: int) -> None:
         user32.SetForegroundWindow(HWND(hwnd))
 
 
+def raise_overlay_window(hwnd: int) -> None:
+    if hwnd:
+        user32.SetWindowPos(
+            HWND(hwnd),
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        )
+
+
 def send_escape() -> None:
     _send_virtual_key(VK_ESCAPE)
+
+
+def restore_input_focus(context: RightClickContext) -> None:
+    if context.hwnd:
+        set_foreground_window(context.hwnd)
+    user32.SetCursorPos(c_int(context.x), c_int(context.y))
+    time.sleep(0.05)
+    _send_mouse_button(MOUSEEVENTF_LEFTDOWN)
+    _send_mouse_button(MOUSEEVENTF_LEFTUP)
+    time.sleep(0.05)
 
 
 def send_unicode_text(hwnd: int, text: str) -> int:
@@ -192,6 +238,11 @@ def _send_virtual_key(vk: int) -> None:
 def _send_unicode_char(code: int, key_up: bool) -> None:
     flags = KEYEVENTF_UNICODE | (KEYEVENTF_KEYUP if key_up else 0)
     item = INPUT(type=INPUT_KEYBOARD, union=INPUTUNION(ki=KBDINPUT(0, code, flags, 0, 0)))
+    user32.SendInput(1, byref(item), sizeof(INPUT))
+
+
+def _send_mouse_button(flags: int) -> None:
+    item = INPUT(type=INPUT_MOUSE, union=INPUTUNION(mi=MOUSEINPUT(0, 0, 0, flags, 0, 0)))
     user32.SendInput(1, byref(item), sizeof(INPUT))
 
 
