@@ -12,9 +12,9 @@ from typing import Iterable
 APP_NAME = "Biscuit"
 MODEL_EXTENSIONS = {".bin", ".gguf", ".pt"}
 SPEECH_MODEL_MARKERS = ("whisper", "ggml")
-DEFAULT_AI_BIO_ROOT = Path(r"C:\Users\marsh\Documents\ai bio")
+DEFAULT_MODEL_SOURCE = "Systran/faster-whisper-tiny.en"
 DEFAULT_WHISPER_CACHE_ROOT = Path.home() / ".cache" / "whisper"
-DEFAULT_MODEL_ROOTS = (DEFAULT_AI_BIO_ROOT, DEFAULT_WHISPER_CACHE_ROOT)
+DEFAULT_MODEL_ROOTS = (DEFAULT_WHISPER_CACHE_ROOT,)
 SKIP_DIRS = {
     ".git",
     ".hg",
@@ -48,8 +48,7 @@ def default_config_path() -> Path:
 def load_config(path: Path | None = None) -> BiscuitConfig:
     config_path = path or default_config_path()
     if not config_path.exists():
-        discovered = choose_best_model(discover_model_candidates())
-        return BiscuitConfig(model_path=str(discovered) if discovered else "")
+        return BiscuitConfig(model_path=DEFAULT_MODEL_SOURCE)
 
     with config_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)

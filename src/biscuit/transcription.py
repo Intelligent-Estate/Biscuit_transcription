@@ -12,6 +12,12 @@ import tempfile
 from .text import normalize_transcript
 
 
+try:  # pragma: no cover - optional backend import varies by install.
+    from faster_whisper import WhisperModel
+except Exception:  # pragma: no cover
+    WhisperModel = None
+
+
 class TranscriptionError(RuntimeError):
     """Raised when local transcription cannot complete."""
 
@@ -88,7 +94,7 @@ def detect_provider(preferred: str = "auto", model_path: Path | None = None) -> 
 
 def transcribe_audio(
     audio_path: Path,
-    model_path: Path,
+    model_path: str | Path,
     language: str = "en",
     provider: str = "auto",
 ) -> str:
@@ -102,7 +108,7 @@ def transcribe_audio(
     raise TranscriptionError(f"Unsupported transcription provider: {choice.name}")
 
 
-def warm_transcription_model(model_path: Path, provider: str = "auto") -> None:
+def warm_transcription_model(model_path: str | Path, provider: str = "auto") -> None:
     choice = detect_provider(provider, model_path)
     if choice.name == "faster_whisper":
         _get_faster_whisper_model(model_path)
@@ -160,11 +166,6 @@ def _transcribe_external(
 
 
 def _transcribe_faster_whisper(model_path: Path, audio_path: Path, language: str) -> str:
-    try:
-        from faster_whisper import WhisperModel
-    except Exception as exc:  # pragma: no cover - backend availability varies.
-        raise TranscriptionError(str(exc)) from exc
-
     model = _get_faster_whisper_model(model_path)
     segments, _info = model.transcribe(str(audio_path), language=language, vad_filter=True)
     return normalize_transcript(" ".join(segment.text for segment in segments))
@@ -181,13 +182,15 @@ def _transcribe_whisper(model_path: Path, audio_path: Path, language: str) -> st
     return normalize_transcript(result.get("text", ""))
 
 
-def _get_faster_whisper_model(model_path: Path) -> object:
-    from faster_whisper import WhisperModel
+def _get_faster_whisper_model(model_path: str | Path) -> object:
+    if WhisperModel is None:
+        raise TranscriptionError("faster-whisper is not installed.")
 
-    key = ("faster_whisper", str(model_path))
+    model_source = str(model_path).replace("\\", "/")
+    key = ("faster_whisper", model_source)
     model = _MODEL_CACHE.get(key)
     if model is None:
-        model = WhisperModel(str(model_path), device="cpu", compute_type="int8")
+        model = WhisperModel(model_source, device="cpu", compute_type="int8")
         _MODEL_CACHE[key] = model
     return model
 

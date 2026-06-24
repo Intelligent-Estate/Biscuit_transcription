@@ -8,7 +8,7 @@ The first build is intentionally lean:
 - Native Windows shell context-menu entries for files, folders, folder backgrounds, and drives.
 - Tiny topmost right-click overlay for private app menus that Windows does not expose through shell registration.
 - Tiny Biscuit tray/menu-bar icon for settings and cursor dictation, with a floating `biscuit` fallback button if tray support is missing.
-- Local model path configuration.
+- Public default speech model source with optional local model override.
 - No model blobs copied into this repository.
 
 ## Run
@@ -60,6 +60,13 @@ That wrapper runs the installer, registers Biscuit in context menus, adds a Star
 ./scripts/install_macos.sh
 ```
 
+The installers install Python dependencies and prefetch the default speech model from:
+
+```text
+Systran/faster-whisper-tiny.en
+https://huggingface.co/Systran/faster-whisper-tiny.en
+```
+
 Windows creates Start Menu and Startup shortcuts, launches Biscuit, and registers a `Biscuit` command in Explorer-style context menus for files, folders, folder backgrounds, and drives. Linux creates a `biscuit.desktop` application entry. macOS creates `~/Applications/Biscuit.app`. At runtime Biscuit tries to show a tiny blue-black/yellow Biscuit icon in the system tray or menu bar; if tray support is not available, it shows the small themed floating Biscuit button.
 
 When Biscuit is already running, the Windows context-menu command signals that running app instead of starting a cold process. Biscuit also warms the selected speech model in the background after startup so normal use avoids the slowest first-load path.
@@ -74,15 +81,17 @@ The settings panel has:
 - Quit Biscuit
 - Save
 
-`Find Model` tries to find a local model under `C:\Users\marsh\Documents\ai bio`. If none is found, use Browse and choose the existing model file manually.
+`Find Model` searches common local cache locations for supported speech model files. The default config uses the hosted faster-whisper model above, so a new checkout can run without any private paths. Use Browse only when you want to point Biscuit at your own local model file.
 
-The AI bio model currently discovered by Biscuit is:
+For GGUF/GGML models, set Provider to a GGUF-capable runner such as `whisper-cli.exe` when it is available on the machine. Leave Provider as `auto` for the hosted faster-whisper source, Python-backed local model directories, or model names.
 
-```text
-C:\Users\marsh\Documents\ai bio\data\stt_probe\whisper-tiny-q4_0.gguf
+To prefetch the default hosted model manually:
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m pip install -r requirements.txt
+python scripts\prefetch_model.py
 ```
-
-For GGUF/GGML models, set Provider to a GGUF-capable runner such as `whisper-cli.exe` when it is available on the machine. Leave Provider as `auto` for Python-backed local model directories or model names.
 
 ## Package
 

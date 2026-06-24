@@ -9,6 +9,7 @@ from biscuit.transcription import (
     ProviderChoice,
     TranscriptionError,
     _MODEL_CACHE,
+    _get_faster_whisper_model,
     _transcribe_external,
     _transcribe_whisper,
     build_external_command,
@@ -57,9 +58,25 @@ class TranscriptionTests(unittest.TestCase):
 
         with patch("biscuit.transcription.shutil.which", return_value=None):
             with patch("biscuit.transcription.importlib.util.find_spec", side_effect=fake_find_spec):
-                choice = detect_provider("auto", Path("C:/Users/marsh/.cache/whisper/small.pt"))
+                choice = detect_provider("auto", Path("C:/Models/whisper/small.pt"))
 
         self.assertEqual(choice.name, "whisper")
+
+    def test_faster_whisper_model_preserves_hugging_face_repo_id(self):
+        _MODEL_CACHE.clear()
+        fake_model = Mock()
+
+        with patch("biscuit.transcription.WhisperModel", create=True, return_value=fake_model) as whisper_model:
+            loaded = _get_faster_whisper_model("Systran/faster-whisper-tiny.en")
+
+        self.assertIs(loaded, fake_model)
+        whisper_model.assert_called_once_with(
+            "Systran/faster-whisper-tiny.en",
+            device="cpu",
+            compute_type="int8",
+        )
+        self.assertIn(("faster_whisper", "Systran/faster-whisper-tiny.en"), _MODEL_CACHE)
+        _MODEL_CACHE.clear()
 
     def test_whisper_model_is_cached_between_transcriptions(self):
         _MODEL_CACHE.clear()

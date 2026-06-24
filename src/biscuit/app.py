@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from .audio import Recorder, RecordingError
 from .config import (
+    DEFAULT_MODEL_SOURCE,
     BiscuitConfig,
     choose_best_model,
     default_config_path,
@@ -74,6 +75,15 @@ def insert_text_into_context(context: RightClickContext, text: str) -> int:
         return 0
     restore_input_focus(context)
     return send_unicode_text(context.hwnd, text)
+
+
+def is_hugging_face_model_id(source: str) -> bool:
+    if "\\" in source or source.startswith(("/", ".")):
+        return False
+    if len(source) > 2 and source[1:3] == ":/":
+        return False
+    parts = source.split("/")
+    return len(parts) == 2 and all(parts)
 
 
 class BiscuitApp:
@@ -156,10 +166,12 @@ class BiscuitApp:
 
     def _warm_transcription_model(self) -> None:
         try:
-            if not self.config.model_path or not self._model_ready(Path(self.config.model_path)):
+            if not self.config.model_path:
+                self.config.model_path = DEFAULT_MODEL_SOURCE
+            if not self._model_ready(self.config.model_path):
                 self.update_model_state()
-            if self.config.model_path and self._model_ready(Path(self.config.model_path)):
-                warm_transcription_model(Path(self.config.model_path), self.config.provider)
+            if self.config.model_path and self._model_ready(self.config.model_path):
+                warm_transcription_model(self.config.model_path, self.config.provider)
         except Exception:
             traceback.print_exc()
 
@@ -197,7 +209,7 @@ class BiscuitApp:
         self.recorder.sample_rate = self.config.sample_rate
 
     def update_model_state(self) -> str:
-        if self.config.model_path and self._model_ready(Path(self.config.model_path)):
+        if self.config.model_path and self._model_ready(self.config.model_path):
             return "model ready"
         best = choose_transcribable_model(discover_model_candidates(), self.config.provider)
         if best:
@@ -205,7 +217,9 @@ class BiscuitApp:
             if save_config_if_possible(self.config_path, self.config):
                 return f"found {best.name}"
             return f"found {best.name} (not saved)"
-        return "choose a local model"
+        self.config.model_path = DEFAULT_MODEL_SOURCE
+        save_config_if_possible(self.config_path, self.config)
+        return "using public model source"
 
     def on_right_click(self, context: RightClickContext) -> None:
         self.last_context = context
@@ -256,22 +270,30 @@ class BiscuitApp:
                 self.root.after(1200, self.quit_app)
 
     def _transcribe(self, audio_path: Path) -> str:
-        if not self.config.model_path or not self._model_ready(Path(self.config.model_path)):
+        if not self.config.model_path or not self._model_ready(self.config.model_path):
             self.update_model_state()
-        if not self.config.model_path or not self._model_ready(Path(self.config.model_path)):
-            raise TranscriptionError("No local model selected.")
+        if not self.config.model_path or not self._model_ready(self.config.model_path):
+            raise TranscriptionError("No transcription model selected.")
         return transcribe_audio(
             audio_path=audio_path,
-            model_path=Path(self.config.model_path),
+            model_path=self.config.model_path,
             language=self.config.language,
             provider=self.config.provider,
         )
 
-    def _model_ready(self, model_path: Path) -> bool:
-        if not model_path.exists():
+    def _model_ready(self, model_path: str | Path) -> bool:
+        source = str(model_path)
+        if is_hugging_face_model_id(source):
+            try:
+                detect_provider(self.config.provider, None)
+                return True
+            except TranscriptionError:
+                return False
+        path = Path(source)
+        if path.suffix and not path.exists():
             return False
         try:
-            detect_provider(self.config.provider, model_path)
+            detect_provider(self.config.provider, path if path.exists() else None)
             return True
         except TranscriptionError:
             return False

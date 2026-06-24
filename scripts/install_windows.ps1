@@ -77,6 +77,11 @@ if (-not (Test-Path $launcher)) {
     throw "Missing launcher: $launcher"
 }
 
+$env:PYTHONPATH = Join-Path $repo "src"
+Write-Host "Fetching Biscuit speech model from Systran/faster-whisper-tiny.en..."
+python -m pip install -r (Join-Path $repo "requirements.txt")
+python (Join-Path $repo "scripts\prefetch_model.py")
+
 $shell = New-Object -ComObject WScript.Shell
 New-BiscuitShortcut -Shell $shell -ShortcutPath $runShortcutPath -LauncherPath $launcher -WorkingDirectory $repo -IconPath $iconPath
 New-BiscuitShortcut -Shell $shell -ShortcutPath $shortcutPath -LauncherPath $launcher -WorkingDirectory $repo -IconPath $iconPath

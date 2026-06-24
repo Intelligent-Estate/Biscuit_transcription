@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from biscuit.app import choose_transcribable_model, main, save_config_if_possible
+from biscuit.app import choose_transcribable_model, is_hugging_face_model_id, main, save_config_if_possible
 from biscuit.config import BiscuitConfig
 from biscuit.transcription import TranscriptionError
 
@@ -42,7 +42,7 @@ class AppCliTests(unittest.TestCase):
 
     def test_choose_transcribable_model_skips_incompatible_candidate(self):
         gguf = Path("C:/Models/whisper-tiny-q4_0.gguf")
-        pt = Path("C:/Users/marsh/.cache/whisper/small.pt")
+        pt = Path("C:/Models/whisper/small.pt")
 
         def fake_detect_provider(provider, model_path):
             del provider
@@ -52,6 +52,11 @@ class AppCliTests(unittest.TestCase):
 
         with patch("biscuit.app.detect_provider", side_effect=fake_detect_provider):
             self.assertEqual(choose_transcribable_model([gguf, pt], "auto"), pt)
+
+    def test_hugging_face_model_id_detection_rejects_local_paths(self):
+        self.assertTrue(is_hugging_face_model_id("Systran/faster-whisper-tiny.en"))
+        self.assertFalse(is_hugging_face_model_id("C:/Models/whisper/small.pt"))
+        self.assertFalse(is_hugging_face_model_id("./models/small.pt"))
 
     def test_save_config_if_possible_reports_denied_write(self):
         with patch("biscuit.app.save_config", side_effect=PermissionError("denied")):

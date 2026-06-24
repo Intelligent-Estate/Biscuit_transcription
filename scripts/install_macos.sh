@@ -11,6 +11,11 @@ RESOURCES_DIR="$BUNDLE/Contents/Resources"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 chmod +x "$LAUNCHER"
 
+export PYTHONPATH="$APP_DIR/src"
+echo "Fetching Biscuit speech model from Systran/faster-whisper-tiny.en..."
+python -m pip install -r "$APP_DIR/requirements.txt"
+python "$APP_DIR/scripts/prefetch_model.py"
+
 cat > "$MACOS_DIR/Biscuit" <<EOF
 #!/usr/bin/env bash
 exec "$LAUNCHER"

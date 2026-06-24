@@ -39,6 +39,12 @@ class InstallerScriptTests(unittest.TestCase):
         self.assertIn("Start-Process", text)
         self.assertIn("if (-not $NoLaunch)", text)
 
+    def test_windows_installer_prefetches_public_model(self):
+        text = (ROOT / "scripts" / "install_windows.ps1").read_text(encoding="utf-8")
+        self.assertIn("Systran/faster-whisper-tiny.en", text)
+        prefetch = (ROOT / "scripts" / "prefetch_model.py").read_text(encoding="utf-8")
+        self.assertIn("snapshot_download", prefetch)
+
     def test_windows_click_installer_wraps_powershell_script(self):
         text = (ROOT / "Install-Biscuit-Windows.cmd").read_text(encoding="utf-8")
         self.assertIn("powershell.exe", text)
