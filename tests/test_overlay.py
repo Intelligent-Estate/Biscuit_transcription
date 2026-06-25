@@ -11,6 +11,7 @@ from biscuit.overlay import (
     CORNER_RADIUS_PANEL,
     CYAN,
     EDGE_WHITE,
+    FLOATING_BORDER,
     GREEN,
     MENU_BG,
     MENU_HOVER,
@@ -56,8 +57,8 @@ class RecordingPillPositionTests(unittest.TestCase):
 
     def test_recording_pill_stays_on_screen_when_near_bottom(self):
         x, y = recording_pill_position(900, 700, screen_width=1024, screen_height=720)
-        self.assertLessEqual(x + 230, 1024)
-        self.assertLessEqual(y + 76, 720)
+        self.assertLessEqual(x + 292, 1024)
+        self.assertLessEqual(y + 86, 720)
 
     def test_processing_state_replaces_stop_button_with_running_biscuit(self):
         state = recording_control_state("processing", tick=1)
@@ -120,8 +121,8 @@ class RecordingPillPositionTests(unittest.TestCase):
         self.assertEqual(calls, ["Biscuit.ico"])
 
     def test_settings_window_uses_forward_looking_layout_metrics(self):
-        self.assertEqual(SETTINGS_WINDOW_GEOMETRY, "680x540+120+120")
-        self.assertEqual(SETTINGS_WINDOW_MINSIZE, (640, 500))
+        self.assertEqual(SETTINGS_WINDOW_GEOMETRY, "720x560+120+120")
+        self.assertEqual(SETTINGS_WINDOW_MINSIZE, (680, 520))
 
     def test_cenedril_interface_uses_rounded_white_accent_surfaces(self):
         self.assertEqual(SURFACE_WHITE, "#ffffff")
@@ -135,6 +136,18 @@ class RecordingPillPositionTests(unittest.TestCase):
         self.assertEqual(points[0], (12, 0))
         self.assertEqual(points[-1], (0, 12))
         self.assertTrue(all(0 <= x <= 100 and 0 <= y <= 40 for x, y in points))
+
+    def test_floating_surfaces_keep_artifact_guard_inside_edges(self):
+        self.assertEqual(FLOATING_BORDER, 2)
+        points = rounded_rect_points(
+            FLOATING_BORDER,
+            FLOATING_BORDER,
+            ACTION_MENU_WIDTH - FLOATING_BORDER - 1,
+            ACTION_MENU_HEIGHT - FLOATING_BORDER - 1,
+            CORNER_RADIUS_ACTION,
+        )
+
+        self.assertTrue(all(x >= FLOATING_BORDER and y >= FLOATING_BORDER for x, y in points))
 
     def test_settings_actions_use_full_biscuit_lifecycle_labels(self):
         self.assertEqual(SETTINGS_ACTION_LABELS["update"], "Find Model")

@@ -34,16 +34,17 @@ UI_FONT_FAMILY = "Courier New"
 UI_FONT = (UI_FONT_FAMILY, 9)
 UI_FONT_BOLD = (UI_FONT_FAMILY, 9, "bold")
 UI_FONT_TITLE = (UI_FONT_FAMILY, 18, "bold")
-ACTION_MENU_WIDTH = 220
-ACTION_MENU_HEIGHT = 30
-RECORDING_PILL_WIDTH = 230
-RECORDING_PILL_HEIGHT = 76
+ACTION_MENU_WIDTH = 236
+ACTION_MENU_HEIGHT = 36
+RECORDING_PILL_WIDTH = 292
+RECORDING_PILL_HEIGHT = 86
 RECORDING_PILL_OFFSET_Y = 28
-SETTINGS_WINDOW_GEOMETRY = "680x540+120+120"
-SETTINGS_WINDOW_MINSIZE = (640, 500)
+SETTINGS_WINDOW_GEOMETRY = "720x560+120+120"
+SETTINGS_WINDOW_MINSIZE = (680, 520)
 CORNER_RADIUS_ACTION = 12
 CORNER_RADIUS_PANEL = 18
 FLOATING_INSET = 4
+FLOATING_BORDER = 2
 SETTINGS_ACTION_LABELS = {
     "update": "Find Model",
     "test": "Test Biscuit",
@@ -115,6 +116,18 @@ def _draw_rounded_rect(
         outline=outline or fill,
         width=width,
     )
+
+
+def _draw_inset_accent(
+    canvas: tk.Canvas,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    *,
+    fill: str = YELLOW,
+) -> int:
+    return _draw_rounded_rect(canvas, x1, y1, x2, y2, 3, fill=fill, outline=fill)
 
 
 def _enable_transparent_edges(window: tk.Toplevel, fallback_bg: str = BLUE_BLACK) -> bool:
@@ -283,18 +296,18 @@ class BiscuitOverlay:
         canvas.pack(fill=tk.BOTH, expand=True)
         _draw_rounded_rect(
             canvas,
-            0,
-            0,
-            ACTION_MENU_WIDTH - 1,
-            ACTION_MENU_HEIGHT - 1,
+            FLOATING_BORDER,
+            FLOATING_BORDER,
+            ACTION_MENU_WIDTH - FLOATING_BORDER - 1,
+            ACTION_MENU_HEIGHT - FLOATING_BORDER - 1,
             CORNER_RADIUS_ACTION,
             fill=MENU_BG,
             outline=EDGE_WHITE,
         )
-        canvas.create_rectangle(0, 0, 7, ACTION_MENU_HEIGHT, fill=YELLOW, outline=YELLOW)
+        _draw_inset_accent(canvas, 12, 10, 16, ACTION_MENU_HEIGHT - 10)
         button = tk.Button(
             window,
-            text="\U0001f399  Biscuit",
+            text="Biscuit",
             command=lambda: self._activate_action(context, on_biscuit),
             bg=MENU_BG,
             fg=MENU_TEXT,
@@ -303,18 +316,18 @@ class BiscuitOverlay:
             relief=tk.FLAT,
             bd=0,
             anchor="w",
-            padx=22,
+            padx=26,
             pady=0,
             font=UI_FONT,
             cursor="hand2",
         )
         canvas.create_window(
-            FLOATING_INSET + 6,
-            FLOATING_INSET,
+            FLOATING_INSET + 4,
+            FLOATING_INSET + 1,
             anchor="nw",
             window=button,
-            width=ACTION_MENU_WIDTH - (FLOATING_INSET * 2) - 6,
-            height=ACTION_MENU_HEIGHT - (FLOATING_INSET * 2),
+            width=ACTION_MENU_WIDTH - (FLOATING_INSET * 2) - 8,
+            height=ACTION_MENU_HEIGHT - (FLOATING_INSET * 2) - 2,
         )
         self._pin_action_window(window)
         window.after(4500, self.close_action)
@@ -368,33 +381,36 @@ class BiscuitOverlay:
         canvas.pack(fill=tk.BOTH, expand=True)
         _draw_rounded_rect(
             canvas,
-            0,
-            0,
-            RECORDING_PILL_WIDTH - 1,
-            RECORDING_PILL_HEIGHT - 1,
+            FLOATING_BORDER,
+            FLOATING_BORDER,
+            RECORDING_PILL_WIDTH - FLOATING_BORDER - 1,
+            RECORDING_PILL_HEIGHT - FLOATING_BORDER - 1,
             CORNER_RADIUS_PANEL,
-            fill=YELLOW,
+            fill=BLUE_BLACK,
             outline=EDGE_WHITE,
         )
         _draw_rounded_rect(
             canvas,
-            FLOATING_INSET,
-            FLOATING_INSET,
-            RECORDING_PILL_WIDTH - FLOATING_INSET - 1,
-            RECORDING_PILL_HEIGHT - FLOATING_INSET - 1,
+            FLOATING_INSET + 2,
+            FLOATING_INSET + 2,
+            RECORDING_PILL_WIDTH - FLOATING_INSET - 3,
+            RECORDING_PILL_HEIGHT - FLOATING_INSET - 3,
             CORNER_RADIUS_PANEL - 4,
             fill=BLUE_BLACK,
             outline=CYAN,
         )
-        frame = tk.Frame(canvas, bg=BLUE_BLACK, padx=12, pady=8)
+        _draw_inset_accent(canvas, 16, 16, 21, RECORDING_PILL_HEIGHT - 16)
+        frame = tk.Frame(canvas, bg=BLUE_BLACK, padx=16, pady=10)
         canvas.create_window(
-            8,
+            24,
             8,
             anchor="nw",
             window=frame,
-            width=RECORDING_PILL_WIDTH - 16,
+            width=RECORDING_PILL_WIDTH - 34,
             height=RECORDING_PILL_HEIGHT - 16,
         )
+        frame.columnconfigure(0, weight=1, minsize=92)
+        frame.columnconfigure(1, minsize=136)
         title = tk.Label(frame, text="BISCUIT", fg=SURFACE_WHITE, bg=BLUE_BLACK, font=UI_FONT_BOLD)
         title.grid(
             row=0, column=0, sticky="w"
@@ -414,14 +430,14 @@ class BiscuitOverlay:
             activeforeground=text_color_for_background("#d63a49"),
             relief=tk.FLAT,
             bd=0,
-            width=16,
-            padx=8,
+            width=15,
+            padx=6,
             pady=4,
             font=UI_FONT,
             cursor="hand2",
         )
         self.recording_control_button = stop_button
-        stop_button.grid(row=0, column=1, rowspan=2, padx=(18, 0))
+        stop_button.grid(row=0, column=1, rowspan=2, padx=(14, 0), sticky="e")
         for widget in (window, canvas, frame, title, status, stop_button):
             widget.bind("<ButtonRelease-1>", request_stop)
         self._render_recording_control("recording")
@@ -491,22 +507,21 @@ class BiscuitOverlay:
         apply_biscuit_icon(window)
         window.protocol("WM_DELETE_WINDOW", self.close_settings)
         window.attributes("-topmost", True)
-        window.configure(bg=BLUE_BLACK, highlightthickness=1, highlightbackground=EDGE_WHITE)
+        window.configure(bg=BLUE_BLACK, highlightthickness=0)
         window.geometry(SETTINGS_WINDOW_GEOMETRY)
         window.minsize(*SETTINGS_WINDOW_MINSIZE)
         self.settings_window = window
         self.settings_status = tk.StringVar(value="ready")
         self.test_output = tk.StringVar(value="Test transcript will appear here.")
 
-        stripe = tk.Frame(window, height=6, bg=YELLOW)
-        stripe.pack(fill=tk.X, side=tk.TOP)
-        glint = tk.Frame(window, height=1, bg=SURFACE_WHITE)
-        glint.pack(fill=tk.X, side=tk.TOP)
-        body = tk.Frame(window, bg=BLUE_BLACK, padx=28, pady=22)
+        body = tk.Frame(window, bg=BLUE_BLACK, padx=30, pady=24)
         body.pack(fill=tk.BOTH, expand=True)
 
         header = tk.Frame(body, bg=BLUE_BLACK)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 20))
+        tk.Frame(header, bg=YELLOW, width=5, height=28).pack(
+            side=tk.LEFT, padx=(0, 12), pady=(2, 0)
+        )
         tk.Label(header, text="Biscuit", fg=SURFACE_WHITE, bg=BLUE_BLACK, font=UI_FONT_TITLE).pack(
             side=tk.LEFT
         )
@@ -571,7 +586,7 @@ class BiscuitOverlay:
             font=UI_FONT,
             justify=tk.LEFT,
             anchor="nw",
-            wraplength=600,
+            wraplength=620,
         ).pack(fill=tk.BOTH, expand=True)
         body.columnconfigure(1, weight=1)
         body.rowconfigure(6, weight=1)
@@ -594,8 +609,8 @@ class BiscuitOverlay:
     def _build_toolbar(self) -> None:
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.root.configure(bg=YELLOW, highlightthickness=1, highlightbackground=EDGE_WHITE)
-        self.root.geometry("92x34+24+24")
+        self.root.configure(bg=BLUE_BLACK, highlightthickness=1, highlightbackground=EDGE_WHITE)
+        self.root.geometry("104x38+24+24")
         button = tk.Button(
             self.root,
             text="biscuit",
@@ -609,7 +624,7 @@ class BiscuitOverlay:
             font=UI_FONT_BOLD,
             cursor="hand2",
         )
-        button.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
+        button.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
     def _activate_action(self, context: RightClickContext, on_biscuit: Callable[[RightClickContext], None]) -> None:
         self.close_action()
