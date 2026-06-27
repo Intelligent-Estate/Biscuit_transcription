@@ -7,15 +7,21 @@ from biscuit.overlay import (
     ACTION_MENU_WIDTH,
     ACCENT_TEXT,
     BLUE_BLACK,
+    CORNER_RADIUS_ACTION,
+    CORNER_RADIUS_PANEL,
     CYAN,
+    EDGE_WHITE,
+    FLOATING_BORDER,
     GREEN,
     MENU_BG,
     MENU_HOVER,
     PANEL,
     RED,
     SETTINGS_ACTION_LABELS,
+    STARTUP_SETTING_LABEL,
     SETTINGS_WINDOW_GEOMETRY,
     SETTINGS_WINDOW_MINSIZE,
+    SURFACE_WHITE,
     TEXT,
     UI_FONT,
     UI_FONT_BOLD,
@@ -25,14 +31,20 @@ from biscuit.overlay import (
     biscuit_icon_path,
     recording_control_state,
     recording_pill_position,
+    rounded_rect_points,
     text_color_for_background,
 )
 
 
 class RecordingPillPositionTests(unittest.TestCase):
-    def test_action_menu_row_appears_at_context_menu_origin(self):
+    def test_action_menu_row_appears_above_context_menu_origin(self):
         x, y = action_menu_position(400, 300)
-        self.assertEqual((x, y), (400, 300))
+        self.assertEqual(x, 400)
+        self.assertEqual(y + ACTION_MENU_HEIGHT, 300)
+
+    def test_action_menu_row_clamps_to_top_edge_when_cursor_near_top(self):
+        x, y = action_menu_position(400, 12)
+        self.assertEqual((x, y), (400, 0))
 
     def test_action_menu_row_stays_on_screen_when_near_edge(self):
         x, y = action_menu_position(1000, 700, screen_width=1024, screen_height=720)
@@ -46,28 +58,28 @@ class RecordingPillPositionTests(unittest.TestCase):
 
     def test_recording_pill_stays_on_screen_when_near_bottom(self):
         x, y = recording_pill_position(900, 700, screen_width=1024, screen_height=720)
-        self.assertLessEqual(x + 230, 1024)
-        self.assertLessEqual(y + 76, 720)
+        self.assertLessEqual(x + 292, 1024)
+        self.assertLessEqual(y + 86, 720)
 
     def test_processing_state_replaces_stop_button_with_running_biscuit(self):
         state = recording_control_state("processing", tick=1)
 
-        self.assertIn("run biscuit, run", state.text)
-        self.assertIn("\n", state.text)
+        self.assertEqual(state.text, "Processing")
+        self.assertNotIn("\n", state.text)
         self.assertNotEqual(state.text, "Stop")
         self.assertEqual(state.tk_state, "disabled")
-        self.assertIn(state.spinner, {"\\(o.o)/", "/(o.o)\\"})
+        self.assertEqual(state.spinner, "")
 
     def test_finished_state_flashes_good_biscuit(self):
         state = recording_control_state("inserted", tick=0)
 
-        self.assertIn("good biscuit", state.text)
-        self.assertIn("\n", state.text)
+        self.assertEqual(state.text, "Ready")
+        self.assertNotIn("\n", state.text)
         self.assertNotEqual(state.text, "Stop")
         self.assertEqual(state.tk_state, "disabled")
 
     def test_visible_text_uses_courier_and_blue_white_tint(self):
-        self.assertEqual(UI_FONT_FAMILY, "Courier New")
+        self.assertEqual(UI_FONT_FAMILY, "Segoe UI")
         self.assertEqual(UI_FONT[0], UI_FONT_FAMILY)
         self.assertEqual(UI_FONT_BOLD[0], UI_FONT_FAMILY)
         self.assertEqual(TEXT, "#f4fbff")
@@ -110,13 +122,41 @@ class RecordingPillPositionTests(unittest.TestCase):
         self.assertEqual(calls, ["Biscuit.ico"])
 
     def test_settings_window_uses_forward_looking_layout_metrics(self):
-        self.assertEqual(SETTINGS_WINDOW_GEOMETRY, "640x390+120+120")
-        self.assertEqual(SETTINGS_WINDOW_MINSIZE, (600, 360))
+        self.assertEqual(SETTINGS_WINDOW_GEOMETRY, "720x560+120+120")
+        self.assertEqual(SETTINGS_WINDOW_MINSIZE, (680, 520))
+
+    def test_cenedril_interface_uses_rounded_white_accent_surfaces(self):
+        self.assertEqual(SURFACE_WHITE, "#ffffff")
+        self.assertEqual(EDGE_WHITE, "#dff7ff")
+        self.assertGreaterEqual(CORNER_RADIUS_ACTION, 10)
+        self.assertGreaterEqual(CORNER_RADIUS_PANEL, 16)
+
+    def test_rounded_rect_points_keep_edges_inside_bounds(self):
+        points = rounded_rect_points(0, 0, 100, 40, 12)
+
+        self.assertEqual(points[0], (12, 0))
+        self.assertEqual(points[-1], (0, 12))
+        self.assertTrue(all(0 <= x <= 100 and 0 <= y <= 40 for x, y in points))
+
+    def test_floating_surfaces_keep_artifact_guard_inside_edges(self):
+        self.assertEqual(FLOATING_BORDER, 2)
+        points = rounded_rect_points(
+            FLOATING_BORDER,
+            FLOATING_BORDER,
+            ACTION_MENU_WIDTH - FLOATING_BORDER - 1,
+            ACTION_MENU_HEIGHT - FLOATING_BORDER - 1,
+            CORNER_RADIUS_ACTION,
+        )
+
+        self.assertTrue(all(x >= FLOATING_BORDER and y >= FLOATING_BORDER for x, y in points))
 
     def test_settings_actions_use_full_biscuit_lifecycle_labels(self):
         self.assertEqual(SETTINGS_ACTION_LABELS["update"], "Find Model")
-        self.assertEqual(SETTINGS_ACTION_LABELS["start"], "Start Biscuit")
-        self.assertEqual(SETTINGS_ACTION_LABELS["stop"], "Quit Biscuit")
+        self.assertEqual(SETTINGS_ACTION_LABELS["test"], "Test Biscuit")
+        self.assertEqual(SETTINGS_ACTION_LABELS["stop"], "Stop Biscuit")
+
+    def test_startup_setting_label_names_login_behavior(self):
+        self.assertEqual(STARTUP_SETTING_LABEL, "Run Biscuit when I log in")
 
     def test_closing_settings_hides_fallback_launcher(self):
         calls = []

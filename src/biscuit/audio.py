@@ -21,6 +21,23 @@ class RecordingResult:
     seconds: float
 
 
+def available_audio_backends() -> list[str]:
+    backends: list[str] = []
+    try:
+        import sounddevice  # noqa: F401
+
+        backends.append("sounddevice")
+    except Exception:
+        pass
+    try:
+        import pyaudio  # noqa: F401
+
+        backends.append("pyaudio")
+    except Exception:
+        pass
+    return backends
+
+
 class Recorder:
     def __init__(self, sample_rate: int = 16000, channels: int = 1):
         self.sample_rate = sample_rate

@@ -57,8 +57,8 @@ def build_external_command(
     ]
 
 
-def detect_provider(preferred: str = "auto", model_path: Path | None = None) -> ProviderChoice:
-    suffix = model_path.suffix.lower() if model_path else ""
+def detect_provider(preferred: str = "auto", model_path: str | Path | None = None) -> ProviderChoice:
+    suffix = Path(str(model_path)).suffix.lower() if model_path else ""
     needs_gguf_runner = suffix in {".gguf", ".bin"}
     needs_whisper_loader = suffix == ".pt"
 
@@ -99,12 +99,13 @@ def transcribe_audio(
     provider: str = "auto",
 ) -> str:
     choice = detect_provider(provider, model_path)
+    model_source = Path(str(model_path))
     if choice.name == "external":
-        return _transcribe_external(choice, model_path, audio_path, language)
+        return _transcribe_external(choice, model_source, audio_path, language)
     if choice.name == "faster_whisper":
         return _transcribe_faster_whisper(model_path, audio_path, language)
     if choice.name == "whisper":
-        return _transcribe_whisper(model_path, audio_path, language)
+        return _transcribe_whisper(model_source, audio_path, language)
     raise TranscriptionError(f"Unsupported transcription provider: {choice.name}")
 
 
@@ -114,7 +115,7 @@ def warm_transcription_model(model_path: str | Path, provider: str = "auto") -> 
         _get_faster_whisper_model(model_path)
         return
     if choice.name == "whisper":
-        _get_whisper_model(model_path)
+        _get_whisper_model(Path(str(model_path)))
 
 
 def _hidden_subprocess_options() -> dict[str, object]:
@@ -142,6 +143,8 @@ def _transcribe_external(
         result = subprocess.run(
             command,
             capture_output=True,
+            stdin=subprocess.DEVNULL,
+            shell=False,
             text=True,
             check=False,
             timeout=180,

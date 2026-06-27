@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
 $launcher = Join-Path $repo "Biscuit-Windows.cmd"
+$silentLauncher = Join-Path $repo "Biscuit-Windows.vbs"
 $iconPath = Join-Path $repo "assets\Biscuit.ico"
 $runShortcutPath = Join-Path $repo "Run Biscuit.lnk"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
@@ -76,18 +77,21 @@ function New-BiscuitShortcut {
 if (-not (Test-Path $launcher)) {
     throw "Missing launcher: $launcher"
 }
+if (-not (Test-Path $silentLauncher)) {
+    throw "Missing silent launcher: $silentLauncher"
+}
 
 $env:PYTHONPATH = Join-Path $repo "src"
 Write-Host "Fetching Biscuit speech model from Systran/faster-whisper-tiny.en..."
-python -m pip install -r (Join-Path $repo "requirements.txt")
+python -m pip install --upgrade -r (Join-Path $repo "requirements.txt")
 python (Join-Path $repo "scripts\prefetch_model.py")
 
 $shell = New-Object -ComObject WScript.Shell
-New-BiscuitShortcut -Shell $shell -ShortcutPath $runShortcutPath -LauncherPath $launcher -WorkingDirectory $repo -IconPath $iconPath
-New-BiscuitShortcut -Shell $shell -ShortcutPath $shortcutPath -LauncherPath $launcher -WorkingDirectory $repo -IconPath $iconPath
-New-BiscuitShortcut -Shell $shell -ShortcutPath $startupShortcutPath -LauncherPath $launcher -WorkingDirectory $repo -IconPath $iconPath
+New-BiscuitShortcut -Shell $shell -ShortcutPath $runShortcutPath -LauncherPath $silentLauncher -WorkingDirectory $repo -IconPath $iconPath
+New-BiscuitShortcut -Shell $shell -ShortcutPath $shortcutPath -LauncherPath $silentLauncher -WorkingDirectory $repo -IconPath $iconPath
+New-BiscuitShortcut -Shell $shell -ShortcutPath $startupShortcutPath -LauncherPath $silentLauncher -WorkingDirectory $repo -IconPath $iconPath
 
-$contextMenuCommand = "`"$launcher`" --dictate-once"
+$contextMenuCommand = "`"$silentLauncher`" --dictate-once"
 $contextMenuRoots = @(
     "HKCU:\Software\Classes\*\shell\Biscuit",
     "HKCU:\Software\Classes\AllFilesystemObjects\shell\Biscuit",
@@ -115,6 +119,6 @@ Write-Host "Biscuit installed to Startup: $startupShortcutPath"
 Write-Host "Biscuit context menu command registered for files, folders, folder backgrounds, and drives."
 
 if (-not $NoLaunch) {
-    Start-Process -FilePath $launcher -WorkingDirectory $repo -WindowStyle Hidden
+    Start-Process -FilePath $silentLauncher -WorkingDirectory $repo -WindowStyle Hidden
     Write-Host "Biscuit launched."
 }

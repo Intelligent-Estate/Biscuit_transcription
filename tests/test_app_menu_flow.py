@@ -35,7 +35,7 @@ class AppMenuFlowTests(unittest.TestCase):
 
         self.assertEqual(calls, ["show settings"])
 
-    def test_quit_biscuit_status_says_bad_dog(self):
+    def test_quit_biscuit_status_says_stopped(self):
         calls = []
 
         app = SimpleNamespace(
@@ -49,7 +49,7 @@ class AppMenuFlowTests(unittest.TestCase):
 
         BiscuitApp.kill_biscuit(app)
 
-        self.assertEqual(calls[-1], ("status", "bad dog"))
+        self.assertEqual(calls[-1], ("status", "stopped"))
 
 
 if __name__ == "__main__":

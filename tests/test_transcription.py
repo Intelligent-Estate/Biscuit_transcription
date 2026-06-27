@@ -14,6 +14,7 @@ from biscuit.transcription import (
     _transcribe_whisper,
     build_external_command,
     detect_provider,
+    transcribe_audio,
     warm_transcription_model,
 )
 
@@ -44,6 +45,8 @@ class TranscriptionTests(unittest.TestCase):
         self.assertTrue(options["creationflags"] & subprocess.CREATE_NO_WINDOW)
         self.assertTrue(options["startupinfo"].dwFlags & subprocess.STARTF_USESHOWWINDOW)
         self.assertEqual(options["startupinfo"].wShowWindow, subprocess.SW_HIDE)
+        self.assertIs(options["stdin"], subprocess.DEVNULL)
+        self.assertFalse(options["shell"])
 
     def test_gguf_model_requires_gguf_capable_runner(self):
         with patch("biscuit.transcription.shutil.which", return_value=None):
@@ -61,6 +64,24 @@ class TranscriptionTests(unittest.TestCase):
                 choice = detect_provider("auto", Path("C:/Models/whisper/small.pt"))
 
         self.assertEqual(choice.name, "whisper")
+
+    def test_detect_provider_accepts_string_model_paths(self):
+        def fake_find_spec(name):
+            return object() if name == "whisper" else None
+
+        with patch("biscuit.transcription.shutil.which", return_value=None):
+            with patch("biscuit.transcription.importlib.util.find_spec", side_effect=fake_find_spec):
+                choice = detect_provider("auto", "C:/Models/whisper/small.pt")
+
+        self.assertEqual(choice.name, "whisper")
+
+    def test_external_transcription_receives_string_model_as_path(self):
+        with patch("biscuit.transcription.detect_provider", return_value=ProviderChoice("external", "whisper-cli.exe")):
+            with patch("biscuit.transcription._transcribe_external", return_value="hello") as external:
+                text = transcribe_audio(Path("C:/Temp/sample.wav"), "C:/Models/whisper/tiny.bin", "en", "auto")
+
+        self.assertEqual(text, "hello")
+        self.assertIsInstance(external.call_args.args[1], Path)
 
     def test_faster_whisper_model_preserves_hugging_face_repo_id(self):
         _MODEL_CACHE.clear()
