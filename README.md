@@ -31,13 +31,7 @@ Double-click or run the launcher for the current desktop:
 
 On Windows, the launcher starts Biscuit with `pythonw.exe` when available, so no command window stays open. Biscuit should only be visible through the tray icon, the settings panel, and the dictation overlays.
 
-There is also a movable Windows shortcut in the project folder:
-
-```text
-Run Biscuit.lnk
-```
-
-It points back to `Biscuit-Windows.cmd` and uses `assets\Biscuit.ico`, so you can drag or copy it to the Desktop and keep the Biscuit icon.
+The Windows installer generates a local `Run Biscuit.lnk` shortcut in your checkout and uses `assets\Biscuit.ico`. That shortcut is intentionally not committed because Windows shortcut files store machine-local paths.
 
 Linux and macOS users may need to mark the launcher executable after checkout:
 
@@ -110,6 +104,12 @@ python scripts\prefetch_model.py
 ```
 
 The package script uses PyInstaller when available and writes output to `dist\Biscuit`. Large model files and recordings are ignored by git.
+
+After packaging, verify the bundled runtime without opening the UI:
+
+```powershell
+.\dist\Biscuit\Biscuit.exe --self-check
+```
 
 ## Notes
 

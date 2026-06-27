@@ -54,8 +54,8 @@ class InstallerScriptTests(unittest.TestCase):
         self.assertIn("scripts\\install_windows.ps1", text)
         self.assertIn("%*", text)
 
-    def test_windows_run_shortcut_artifacts_exist(self):
-        self.assertTrue((ROOT / "Run Biscuit.lnk").exists())
+    def test_windows_run_shortcut_is_generated_not_committed(self):
+        self.assertFalse((ROOT / "Run Biscuit.lnk").exists())
         self.assertTrue((ROOT / "assets" / "Biscuit.ico").exists())
 
     def test_linux_installer_creates_desktop_entry(self):

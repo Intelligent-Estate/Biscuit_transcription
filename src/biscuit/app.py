@@ -31,6 +31,7 @@ from .readiness import (
 from .status import DictationOutcome, DictationResult, status_text
 from .startup import is_run_at_login_enabled, sync_run_at_login
 from .tray import TrayCallbacks, TrayController
+from .release import release_self_check
 from .desktop import (
     MouseHook,
     RightClickContext,
@@ -384,6 +385,12 @@ class BiscuitApp:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
+    if "--self-check" in args:
+        ok, lines = release_self_check()
+        for line in lines:
+            print(line)
+        raise SystemExit(0 if ok else 1)
+
     dictate_once = "--dictate-once" in args
     if dictate_once and send_dictation_request():
         return

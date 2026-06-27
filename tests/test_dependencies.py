@@ -26,6 +26,27 @@ class DependencyManifestTests(unittest.TestCase):
         for requirement in CURRENT_REQUIREMENTS:
             self.assertIn(f'"{requirement}"', pyproject)
 
+    def test_package_script_forces_dynamic_runtime_imports(self):
+        package_script = (ROOT / "scripts" / "package_biscuit.ps1").read_text(encoding="utf-8")
+
+        self.assertIn(".biscuit-build-venv", package_script)
+        self.assertIn("python -m venv $buildVenv", package_script)
+        self.assertIn("-r (Join-Path $repo \"requirements.txt\") pyinstaller", package_script)
+        self.assertIn("--console", package_script)
+        self.assertNotIn("--windowed", package_script)
+        self.assertNotIn("--collect-submodules", package_script)
+
+        for module in (
+            "biscuit.release",
+            "faster_whisper",
+            "ctranslate2",
+            "huggingface_hub",
+            "sounddevice",
+            "pyaudio",
+            "pystray",
+        ):
+            self.assertIn(f"--hidden-import {module}", package_script)
+
 
 if __name__ == "__main__":
     unittest.main()

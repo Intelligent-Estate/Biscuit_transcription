@@ -30,6 +30,9 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("-WindowStyle Hidden", text)
         self.assertNotIn("python -m biscuit", text)
 
+    def test_repository_does_not_commit_machine_local_windows_shortcut(self):
+        self.assertFalse((ROOT / "Run Biscuit.lnk").exists())
+
     def test_linux_launcher_starts_biscuit_from_repo_root(self):
         text = (ROOT / "biscuit-linux.sh").read_text(encoding="utf-8")
         self.assertIn('export PYTHONPATH="$APP_DIR/src"', text)

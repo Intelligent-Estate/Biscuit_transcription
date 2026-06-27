@@ -2,7 +2,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from biscuit.app import choose_transcribable_model, is_hugging_face_model_id, main, save_config_if_possible
+from biscuit.app import (
+    choose_transcribable_model,
+    is_hugging_face_model_id,
+    main,
+    release_self_check,
+    save_config_if_possible,
+)
 from biscuit.config import BiscuitConfig
 from biscuit.transcription import TranscriptionError
 
@@ -76,6 +82,36 @@ class AppCliTests(unittest.TestCase):
 
         sync.assert_called_once()
         self.assertTrue(sync.call_args.args[0])
+
+    def test_release_self_check_reports_missing_runtime_modules(self):
+        def missing_selected_modules(name):
+            return None if name in {"faster_whisper", "sounddevice", "pyaudio"} else object()
+
+        with patch("biscuit.release.importlib.util.find_spec", side_effect=missing_selected_modules):
+            ok, lines = release_self_check()
+
+        self.assertFalse(ok)
+        self.assertIn("missing faster_whisper", lines)
+        self.assertIn("missing sounddevice or pyaudio", lines)
+
+    def test_main_self_check_does_not_start_gui(self):
+        with patch("biscuit.app.release_self_check", return_value=(True, ["release self-check ok"])):
+            with patch("biscuit.app.BiscuitApp") as app_class:
+                with self.assertRaises(SystemExit) as exit_context:
+                    main(["--self-check"])
+
+        self.assertEqual(exit_context.exception.code, 0)
+        app_class.assert_not_called()
+
+    def test_package_entrypoint_checks_release_before_app_import(self):
+        main_text = Path("src/biscuit/__main__.py").read_text(encoding="utf-8")
+
+        self.assertLess(main_text.index("--self-check"), main_text.index("from biscuit.app import main"))
+        self.assertLess(main_text.index("--self-check-file"), main_text.index("from biscuit.app import main"))
+        self.assertLess(
+            main_text.index("from biscuit.release import release_self_check"),
+            main_text.index("from biscuit.app import main"),
+        )
 
 
 if __name__ == "__main__":
