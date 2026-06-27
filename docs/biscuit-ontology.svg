@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720" role="img" aria-labelledby="title desc">
+  <title id="title">Biscuit ontology and run flow</title>
+  <desc id="desc">A simple visual explanation of Biscuit: the user chooses Biscuit, Biscuit captures the target, records audio, transcribes locally, inserts text, and falls back to clipboard when needed.</desc>
+  <defs>
+    <style>
+      .bg { fill: #07111f; }
+      .panel { fill: #101b2d; stroke: #2f4668; stroke-width: 2; }
+      .panel-soft { fill: #17243a; stroke: #355173; stroke-width: 2; }
+      .core { fill: #ffd23f; stroke: #fff1a6; stroke-width: 3; }
+      .text { fill: #f4fbff; font-family: "Segoe UI", Arial, sans-serif; }
+      .dark { fill: #07111f; font-family: "Segoe UI", Arial, sans-serif; }
+      .muted { fill: #9fb2cc; font-family: "Segoe UI", Arial, sans-serif; }
+      .small { font-size: 15px; font-family: "Courier New", Consolas, monospace; }
+      .body { font-size: 21px; }
+      .label { font-size: 24px; font-weight: 700; }
+      .title { font-size: 42px; font-weight: 800; }
+      .sub { font-size: 19px; font-family: "Courier New", Consolas, monospace; }
+      .pill { fill: #60d7ff; }
+      .green { fill: #55d488; }
+      .red { fill: #ff4d5e; }
+      .arrow { stroke: #60d7ff; stroke-width: 4; fill: none; marker-end: url(#arrowHead); }
+      .thin { stroke: #8ea0b8; stroke-width: 2; fill: none; stroke-dasharray: 8 8; }
+    </style>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#60d7ff" />
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <rect class="bg" width="1180" height="720" rx="0" />
+  <rect x="0" y="0" width="1180" height="12" fill="#ffd23f" />
+
+  <text class="text title" x="56" y="72">How Biscuit Runs</text>
+  <text class="muted sub" x="58" y="110">A small local bridge from voice to any window with a simple click.</text>
+
+  <g filter="url(#shadow)">
+    <rect class="panel" x="56" y="158" width="212" height="122" rx="8" />
+    <text class="text label" x="162" y="204" text-anchor="middle">1. You choose</text>
+    <text class="muted small" x="162" y="237" text-anchor="middle">Right-click, tray,</text>
+    <text class="muted small" x="162" y="262" text-anchor="middle">or launcher.</text>
+
+    <rect class="panel-soft" x="338" y="158" width="212" height="122" rx="8" />
+    <text class="text label" x="444" y="204" text-anchor="middle">2. Biscuit</text>
+    <text class="muted small" x="444" y="237" text-anchor="middle">Captures target</text>
+    <text class="muted small" x="444" y="262" text-anchor="middle">window and cursor.</text>
+
+    <rect class="panel" x="620" y="158" width="212" height="122" rx="8" />
+    <text class="text label" x="726" y="204" text-anchor="middle">3. Listen</text>
+    <text class="muted small" x="726" y="237" text-anchor="middle">Mic records only</text>
+    <text class="muted small" x="726" y="262" text-anchor="middle">after Start.</text>
+
+    <rect class="panel-soft" x="902" y="158" width="212" height="122" rx="8" />
+    <text class="text label" x="1008" y="204" text-anchor="middle">4. Words</text>
+    <text class="muted small" x="1008" y="237" text-anchor="middle">Local speech model</text>
+    <text class="muted small" x="1008" y="262" text-anchor="middle">turns audio to text.</text>
+  </g>
+
+  <path class="arrow" d="M 276 219 L 326 219" />
+  <path class="arrow" d="M 558 219 L 608 219" />
+  <path class="arrow" d="M 840 219 L 890 219" />
+
+  <g filter="url(#shadow)">
+    <rect class="core" x="386" y="350" width="408" height="126" rx="10" />
+    <text class="dark title" x="590" y="407" text-anchor="middle">BISCUIT</text>
+    <text class="dark body" x="590" y="444" text-anchor="middle">capture -> record -> transcribe -> insert</text>
+  </g>
+
+  <path class="arrow" d="M 162 286 C 190 344, 270 412, 374 412" />
+  <path class="arrow" d="M 1008 286 C 970 344, 878 412, 808 412" />
+
+  <g filter="url(#shadow)">
+    <rect class="panel" x="116" y="544" width="250" height="104" rx="8" />
+    <text class="text label" x="241" y="585" text-anchor="middle">Insert</text>
+    <text class="muted small" x="241" y="618" text-anchor="middle">Restores focus and</text>
+    <text class="muted small" x="241" y="641" text-anchor="middle">types Unicode text.</text>
+
+    <rect class="panel-soft" x="466" y="544" width="250" height="104" rx="8" />
+    <text class="text label" x="591" y="585" text-anchor="middle">Fallback</text>
+    <text class="muted small" x="591" y="618" text-anchor="middle">If insertion fails,</text>
+    <text class="muted small" x="591" y="641" text-anchor="middle">copy to clipboard.</text>
+
+    <rect class="panel" x="816" y="544" width="250" height="104" rx="8" />
+    <text class="text label" x="941" y="585" text-anchor="middle">Control</text>
+    <text class="muted small" x="941" y="618" text-anchor="middle">Settings choose model,</text>
+    <text class="muted small" x="941" y="641" text-anchor="middle">language, provider.</text>
+  </g>
+
+  <path class="arrow" d="M 498 484 C 430 514, 344 545, 300 565" />
+  <path class="arrow" d="M 590 484 L 590 532" />
+  <path class="thin" d="M 768 476 C 846 500, 900 526, 934 544" />
+
+  <g>
+    <rect x="56" y="314" width="270" height="108" rx="8" fill="#0c1728" stroke="#355173" stroke-width="2" />
+    <circle cx="88" cy="350" r="12" class="green" />
+    <text class="text body" x="112" y="357">User-controlled start</text>
+    <circle cx="88" cy="390" r="12" class="red" />
+    <text class="text body" x="112" y="397">Stop ends recording</text>
+
+    <rect x="854" y="314" width="270" height="108" rx="8" fill="#0c1728" stroke="#355173" stroke-width="2" />
+    <circle cx="886" cy="350" r="12" class="pill" />
+    <text class="text body" x="910" y="357">Model stays external</text>
+    <circle cx="886" cy="390" r="12" class="pill" />
+    <text class="text body" x="910" y="397">Temp audio is not kept.</text>
+  </g>
+
+  <text class="muted small" x="590" y="692" text-anchor="middle">Cenedril Frontier Toolkit Piece 4-Biscuit</text>
+</svg>

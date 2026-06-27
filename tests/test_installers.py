@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class InstallerScriptTests(unittest.TestCase):
     def test_windows_installer_creates_start_menu_launcher(self):
         text = (ROOT / "scripts" / "install_windows.ps1").read_text(encoding="utf-8")
-        self.assertIn('"Biscuit-Windows.cmd"', text)
+        self.assertIn('"Biscuit-Windows.vbs"', text)
         self.assertIn('"Run Biscuit.lnk"', text)
         self.assertIn('"assets\\Biscuit.ico"', text)
         self.assertNotIn("launchers\\Biscuit-Windows.cmd", text)
@@ -27,6 +27,7 @@ class InstallerScriptTests(unittest.TestCase):
         ):
             self.assertIn(context_root, text)
         self.assertIn("--dictate-once", text)
+        self.assertIn("$silentLauncher", text)
         self.assertIn("[AllowEmptyString()]", text)
         self.assertIn("CreateSubKey", text)
         self.assertIn('Set-HkcuRegistryString -Path $commandRoot -Name "" -Value $contextMenuCommand', text)
@@ -42,6 +43,7 @@ class InstallerScriptTests(unittest.TestCase):
     def test_windows_installer_prefetches_public_model(self):
         text = (ROOT / "scripts" / "install_windows.ps1").read_text(encoding="utf-8")
         self.assertIn("Systran/faster-whisper-tiny.en", text)
+        self.assertIn("python -m pip install --upgrade -r", text)
         prefetch = (ROOT / "scripts" / "prefetch_model.py").read_text(encoding="utf-8")
         self.assertIn("snapshot_download", prefetch)
 
@@ -52,20 +54,22 @@ class InstallerScriptTests(unittest.TestCase):
         self.assertIn("scripts\\install_windows.ps1", text)
         self.assertIn("%*", text)
 
-    def test_windows_run_shortcut_artifacts_exist(self):
-        self.assertTrue((ROOT / "Run Biscuit.lnk").exists())
+    def test_windows_run_shortcut_is_generated_not_committed(self):
+        self.assertFalse((ROOT / "Run Biscuit.lnk").exists())
         self.assertTrue((ROOT / "assets" / "Biscuit.ico").exists())
 
     def test_linux_installer_creates_desktop_entry(self):
         text = (ROOT / "scripts" / "install_linux.sh").read_text(encoding="utf-8")
         self.assertIn("biscuit.desktop", text)
         self.assertIn('LAUNCHER="$APP_DIR/biscuit-linux.sh"', text)
+        self.assertIn("python -m pip install --upgrade -r", text)
         self.assertIn("Biscuit", text)
 
     def test_macos_installer_creates_app_bundle_launcher(self):
         text = (ROOT / "scripts" / "install_macos.sh").read_text(encoding="utf-8")
         self.assertIn("Biscuit.app", text)
         self.assertIn('LAUNCHER="$APP_DIR/Biscuit-macOS.command"', text)
+        self.assertIn("python -m pip install --upgrade -r", text)
 
 
 if __name__ == "__main__":

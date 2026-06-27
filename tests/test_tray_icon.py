@@ -96,6 +96,7 @@ class TrayIconTests(unittest.TestCase):
 
         labels = [item.text for item in menu_items]
         self.assertIn("Start Biscuit", labels)
+        self.assertIn("Stop Biscuit", labels)
         self.assertIn("Quit Biscuit", labels)
         self.assertNotIn("Kill Biscuit", labels)
         self.assertNotIn("Kill Biscuit (Quit)", labels)

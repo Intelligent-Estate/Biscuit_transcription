@@ -1,27 +1,35 @@
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$env:PYTHONPATH = Join-Path $repo "src"
 Set-Location $repo
 
-$pyinstallerCommand = Get-Command pyinstaller -ErrorAction SilentlyContinue
-$pyinstallerPath = if ($pyinstallerCommand) { $pyinstallerCommand.Source } else { "" }
-if (-not $pyinstallerPath) {
-    python -m pip install pyinstaller
-    $pyinstallerCommand = Get-Command pyinstaller -ErrorAction SilentlyContinue
-    $pyinstallerPath = if ($pyinstallerCommand) { $pyinstallerCommand.Source } else { "" }
+$buildVenv = Join-Path $repo ".biscuit-build-venv"
+if (-not (Test-Path $buildVenv)) {
+    python -m venv $buildVenv
 }
 
-if (-not $pyinstallerPath) {
-    throw "PyInstaller was not found. Run from source with scripts\run_biscuit.ps1."
+$venvPython = Join-Path $buildVenv "Scripts\python.exe"
+$venvPyinstaller = Join-Path $buildVenv "Scripts\pyinstaller.exe"
+& $venvPython -m pip install --upgrade pip
+& $venvPython -m pip install --upgrade -r (Join-Path $repo "requirements.txt") pyinstaller
+
+if (-not (Test-Path $venvPyinstaller)) {
+    throw "PyInstaller was not found in the clean build environment. Run from source with scripts\run_biscuit.ps1."
 }
 
-& $pyinstallerPath `
+$env:PYTHONPATH = Join-Path $repo "src"
+& $venvPyinstaller `
     --noconfirm `
     --clean `
-    --windowed `
+    --console `
     --name Biscuit `
     --paths src `
+    --hidden-import biscuit.release `
+    --hidden-import faster_whisper `
+    --hidden-import ctranslate2 `
+    --hidden-import huggingface_hub `
+    --hidden-import sounddevice `
+    --hidden-import pyaudio `
     --hidden-import pystray `
     --hidden-import pystray._win32 `
     --hidden-import PIL.Image `

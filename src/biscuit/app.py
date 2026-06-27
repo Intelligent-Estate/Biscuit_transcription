@@ -21,7 +21,17 @@ from .config import (
     save_config,
 )
 from .overlay import BiscuitOverlay, SettingsCallbacks, apply_biscuit_icon
+from .readiness import (
+    check_insertion_readiness,
+    check_invocation_readiness,
+    check_microphone_readiness,
+    check_model_readiness,
+    summarize_readiness,
+)
+from .status import DictationOutcome, DictationResult, status_text
+from .startup import is_run_at_login_enabled, sync_run_at_login
 from .tray import TrayCallbacks, TrayController
+from .release import release_self_check
 from .desktop import (
     MouseHook,
     RightClickContext,
@@ -77,6 +87,35 @@ def insert_text_into_context(context: RightClickContext, text: str) -> int:
     return send_unicode_text(context.hwnd, text)
 
 
+def finish_dictation_result(recording, context, transcribe, insert, copy) -> DictationOutcome:
+    try:
+        text = transcribe(recording.path)
+    except TranscriptionError as exc:
+        return DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc))
+    if not text:
+        return DictationOutcome(DictationResult.NO_SPEECH)
+    if context is None:
+        copy(text)
+        return DictationOutcome(DictationResult.COPIED, "target unavailable")
+    try:
+        insert(context, text)
+    except Exception:
+        copy(text)
+        return DictationOutcome(DictationResult.COPIED, "direct insertion blocked")
+    return DictationOutcome(DictationResult.INSERTED)
+
+
+def finish_test_dictation_result(recording, transcribe, insert=None, copy=None) -> tuple[DictationOutcome, str]:
+    del insert, copy
+    try:
+        text = transcribe(recording.path)
+    except TranscriptionError as exc:
+        return DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc)), ""
+    if not text:
+        return DictationOutcome(DictationResult.NO_SPEECH), ""
+    return DictationOutcome(DictationResult.INSERTED, "test complete"), text
+
+
 def is_hugging_face_model_id(source: str) -> bool:
     if "\\" in source or source.startswith(("/", ".")):
         return False
@@ -90,6 +129,9 @@ class BiscuitApp:
     def __init__(self, config_path: Path | None = None, exit_after_recording: bool = False):
         self.config_path = config_path or default_config_path()
         self.config = load_config(self.config_path)
+        self.repo_root = Path(__file__).resolve().parents[2]
+        if is_run_at_login_enabled():
+            self.config.run_at_login = True
         self.exit_after_recording = exit_after_recording
         self.root = tk.Tk()
         self.root.title("Biscuit")
@@ -109,12 +151,13 @@ class BiscuitApp:
         tray_available = self.tray.start()
         callbacks = SettingsCallbacks(
             on_save=self.save_settings,
-            on_start=self.start_biscuit,
+            on_test=self.begin_test_recording,
             on_kill=self.kill_biscuit,
             on_update=self.update_model_state,
         )
         self.overlay = BiscuitOverlay(self.root, self.config, callbacks, show_fallback_toolbar=not tray_available)
         self.last_context: RightClickContext | None = None
+        self._test_recording = False
         self._request_socket: socket.socket | None = None
         self._request_thread: threading.Thread | None = None
         self._warmup_thread: threading.Thread | None = None
@@ -140,8 +183,7 @@ class BiscuitApp:
 
     def start_biscuit(self) -> None:
         self.hook.start()
-        status = "listening" if self.hook.running else "hook not active"
-        self.overlay.set_settings_status(status)
+        self.overlay.set_settings_status(self.readiness_summary())
 
     def start_request_server(self) -> None:
         if self._request_socket is not None:
@@ -201,11 +243,25 @@ class BiscuitApp:
         self.hook.stop()
         self.overlay.close_action()
         self.overlay.close_recording()
-        self.overlay.set_settings_status("bad dog")
+        self.overlay.set_settings_status("stopped")
+
+    def readiness_summary(self) -> str:
+        states = [
+            check_invocation_readiness(
+                listener_running=self.hook.running,
+                request_server_running=self._request_socket is not None,
+                tray_available=self.tray.available,
+            ),
+            check_microphone_readiness(),
+            check_model_readiness(self.config),
+            check_insertion_readiness(self.last_context),
+        ]
+        return summarize_readiness(states)
 
     def save_settings(self, config: BiscuitConfig) -> None:
         self.config = config
         save_config(self.config_path, self.config)
+        sync_run_at_login(self.config.run_at_login, getattr(self, "repo_root", Path(__file__).resolve().parents[2]))
         self.recorder.sample_rate = self.config.sample_rate
 
     def update_model_state(self) -> str:
@@ -238,31 +294,46 @@ class BiscuitApp:
     def begin_recording_from_cursor(self) -> None:
         self.begin_recording(get_foreground_context())
 
+    def begin_test_recording(self) -> None:
+        self.last_context = None
+        self._test_recording = True
+        self.overlay.set_test_output("Recording test. Use the red Stop control when finished.")
+        self.begin_recording(get_foreground_context())
+
     def stop_recording(self) -> None:
         self.overlay.set_recording_status("processing")
         worker = threading.Thread(target=self._finish_recording, name="BiscuitTranscribe", daemon=True)
         worker.start()
 
     def _finish_recording(self) -> None:
+        test_recording = self._test_recording
+        self._test_recording = False
         try:
             recording = self.recorder.stop()
-            text = self._transcribe(recording.path)
-            if not text:
-                self._ui_status("no speech found")
-                return
-            context = self.last_context
-            if context is None:
-                self._copy_to_clipboard(text)
-                self._ui_status("copied")
-                return
-            try:
-                insert_text_into_context(context, text)
-                self._ui_status("inserted")
-            except Exception:
-                self._copy_to_clipboard(text)
-                self._ui_status("copied fallback")
-        except (RecordingError, TranscriptionError, Exception) as exc:
-            self._ui_status(f"error: {exc}")
+            if test_recording:
+                outcome, transcript = finish_test_dictation_result(recording=recording, transcribe=self._transcribe)
+                self._ui_status(status_text(outcome))
+                self._ui_test_output(transcript or status_text(outcome))
+            else:
+                outcome = finish_dictation_result(
+                    recording=recording,
+                    context=self.last_context,
+                    transcribe=self._transcribe,
+                    insert=insert_text_into_context,
+                    copy=self._copy_to_clipboard,
+                )
+                self._ui_status(status_text(outcome))
+        except RecordingError as exc:
+            status = status_text(DictationOutcome(DictationResult.MICROPHONE_ERROR, str(exc)))
+            self._ui_status(status)
+            if test_recording:
+                self._ui_test_output(status)
+            traceback.print_exc()
+        except Exception as exc:
+            status = status_text(DictationOutcome(DictationResult.TRANSCRIPTION_ERROR, str(exc)))
+            self._ui_status(status)
+            if test_recording:
+                self._ui_test_output(status)
             traceback.print_exc()
         finally:
             self.root.after(900, self.overlay.close_recording)
@@ -308,9 +379,18 @@ class BiscuitApp:
     def _ui_status(self, status: str) -> None:
         self.root.after(0, lambda: self.overlay.set_recording_status(status))
 
+    def _ui_test_output(self, text: str) -> None:
+        self.root.after(0, lambda: self.overlay.set_test_output(text))
+
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
+    if "--self-check" in args:
+        ok, lines = release_self_check()
+        for line in lines:
+            print(line)
+        raise SystemExit(0 if ok else 1)
+
     dictate_once = "--dictate-once" in args
     if dictate_once and send_dictation_request():
         return

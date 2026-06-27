@@ -36,6 +36,7 @@ class BiscuitConfig:
     provider: str = "auto"
     sample_rate: int = 16000
     keep_debug_audio: bool = False
+    run_at_login: bool = False
 
 
 def default_config_path() -> Path:
