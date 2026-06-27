@@ -62,6 +62,21 @@ class AppCliTests(unittest.TestCase):
         with patch("biscuit.app.save_config", side_effect=PermissionError("denied")):
             self.assertFalse(save_config_if_possible(Path("C:/Locked/biscuit.json"), BiscuitConfig()))
 
+    def test_save_settings_syncs_run_at_login_preference(self):
+        app = object.__new__(__import__("biscuit.app").app.BiscuitApp)
+        app.config_path = Path("C:/Users/Ada/AppData/Roaming/Biscuit/biscuit.json")
+        app.recorder = type("Recorder", (), {"sample_rate": 0})()
+
+        with patch("biscuit.app.save_config"):
+            with patch("biscuit.app.sync_run_at_login") as sync:
+                __import__("biscuit.app").app.BiscuitApp.save_settings(
+                    app,
+                    BiscuitConfig(run_at_login=True),
+                )
+
+        sync.assert_called_once()
+        self.assertTrue(sync.call_args.args[0])
+
 
 if __name__ == "__main__":
     unittest.main()

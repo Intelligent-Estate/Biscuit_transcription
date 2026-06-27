@@ -45,6 +45,8 @@ class TranscriptionTests(unittest.TestCase):
         self.assertTrue(options["creationflags"] & subprocess.CREATE_NO_WINDOW)
         self.assertTrue(options["startupinfo"].dwFlags & subprocess.STARTF_USESHOWWINDOW)
         self.assertEqual(options["startupinfo"].wShowWindow, subprocess.SW_HIDE)
+        self.assertIs(options["stdin"], subprocess.DEVNULL)
+        self.assertFalse(options["shell"])
 
     def test_gguf_model_requires_gguf_capable_runner(self):
         with patch("biscuit.transcription.shutil.which", return_value=None):

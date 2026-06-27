@@ -82,6 +82,7 @@ The settings panel has:
 - Model
 - Language
 - Provider
+- Run Biscuit when I log in
 - Find Model
 - Test Biscuit
 - Stop Biscuit

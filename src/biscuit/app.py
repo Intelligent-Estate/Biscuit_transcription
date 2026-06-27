@@ -29,6 +29,7 @@ from .readiness import (
     summarize_readiness,
 )
 from .status import DictationOutcome, DictationResult, status_text
+from .startup import is_run_at_login_enabled, sync_run_at_login
 from .tray import TrayCallbacks, TrayController
 from .desktop import (
     MouseHook,
@@ -127,6 +128,9 @@ class BiscuitApp:
     def __init__(self, config_path: Path | None = None, exit_after_recording: bool = False):
         self.config_path = config_path or default_config_path()
         self.config = load_config(self.config_path)
+        self.repo_root = Path(__file__).resolve().parents[2]
+        if is_run_at_login_enabled():
+            self.config.run_at_login = True
         self.exit_after_recording = exit_after_recording
         self.root = tk.Tk()
         self.root.title("Biscuit")
@@ -256,6 +260,7 @@ class BiscuitApp:
     def save_settings(self, config: BiscuitConfig) -> None:
         self.config = config
         save_config(self.config_path, self.config)
+        sync_run_at_login(self.config.run_at_login, getattr(self, "repo_root", Path(__file__).resolve().parents[2]))
         self.recorder.sample_rate = self.config.sample_rate
 
     def update_model_state(self) -> str:

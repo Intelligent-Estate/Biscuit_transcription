@@ -143,6 +143,8 @@ def _transcribe_external(
         result = subprocess.run(
             command,
             capture_output=True,
+            stdin=subprocess.DEVNULL,
+            shell=False,
             text=True,
             check=False,
             timeout=180,

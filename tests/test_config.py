@@ -16,9 +16,16 @@ class ConfigTests(unittest.TestCase):
         with self.subTest("round trip"):
             with tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp) / "biscuit.json"
-                config = BiscuitConfig(model_path="C:/model.bin", language="en", provider="auto")
+                config = BiscuitConfig(
+                    model_path="C:/model.bin",
+                    language="en",
+                    provider="auto",
+                    run_at_login=True,
+                )
                 save_config(path, config)
-                self.assertEqual(load_config(path).model_path, "C:/model.bin")
+                loaded = load_config(path)
+                self.assertEqual(loaded.model_path, "C:/model.bin")
+                self.assertTrue(loaded.run_at_login)
 
     def test_missing_config_defaults_to_public_hugging_face_model(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -28,6 +35,7 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(config.model_path, DEFAULT_MODEL_SOURCE)
         self.assertEqual(config.provider, "auto")
+        self.assertFalse(config.run_at_login)
 
     def test_choose_best_model_prefers_small_quantized_file(self):
         with tempfile.TemporaryDirectory() as tmp:

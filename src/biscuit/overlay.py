@@ -30,7 +30,8 @@ MUTED = "#8ea0b8"
 MENU_BG = BLUE_BLACK
 MENU_HOVER = PANEL
 MENU_TEXT = TEXT
-UI_FONT_FAMILY = "Courier New"
+DROP_MENU_OUTLINE = "#61d0ff"
+UI_FONT_FAMILY = "Segoe UI"
 UI_FONT = (UI_FONT_FAMILY, 9)
 UI_FONT_BOLD = (UI_FONT_FAMILY, 9, "bold")
 UI_FONT_TITLE = (UI_FONT_FAMILY, 18, "bold")
@@ -51,7 +52,9 @@ SETTINGS_ACTION_LABELS = {
     "stop": "Stop Biscuit",
     "save": "Save",
 }
-RUNNING_DOG_FRAMES = ("\\(o.o)/", "/(o.o)\\")
+STARTUP_SETTING_LABEL = "Run Biscuit when I log in"
+PROCESSING_LABEL = "Processing"
+READY_LABEL = "Ready"
 FINISHED_RECORDING_STATUSES = {
     status_text(DictationOutcome(DictationResult.COPIED)),
     status_text(DictationOutcome(DictationResult.INSERTED)),
@@ -206,21 +209,20 @@ class RecordingControlState:
 
 
 def recording_control_state(status: str, tick: int = 0) -> RecordingControlState:
+    del tick
     if status == "processing":
-        spinner = RUNNING_DOG_FRAMES[tick % len(RUNNING_DOG_FRAMES)]
         return RecordingControlState(
-            text=f"run biscuit, run\n{spinner}",
-            spinner=spinner,
+            text=PROCESSING_LABEL,
+            spinner="",
             tk_state=tk.DISABLED,
             bg=GUNMETAL,
             fg=TEXT,
             active_bg=GUNMETAL,
         )
     if status in FINISHED_RECORDING_STATUSES or status.startswith(FINISHED_RECORDING_PREFIXES):
-        spinner = RUNNING_DOG_FRAMES[tick % len(RUNNING_DOG_FRAMES)]
         return RecordingControlState(
-            text=f"good biscuit\n{spinner}",
-            spinner=spinner,
+            text=READY_LABEL,
+            spinner="",
             tk_state=tk.DISABLED,
             bg=GREEN,
             fg=text_color_for_background(GREEN),
@@ -261,6 +263,7 @@ class BiscuitOverlay:
         self.model_var = tk.StringVar(value=config.model_path)
         self.language_var = tk.StringVar(value=config.language)
         self.provider_var = tk.StringVar(value=config.provider)
+        self.run_at_login_var = tk.BooleanVar(value=config.run_at_login)
         if show_fallback_toolbar:
             self._build_toolbar()
         else:
@@ -302,7 +305,8 @@ class BiscuitOverlay:
             ACTION_MENU_HEIGHT - FLOATING_BORDER - 1,
             CORNER_RADIUS_ACTION,
             fill=MENU_BG,
-            outline=EDGE_WHITE,
+            outline=DROP_MENU_OUTLINE,
+            width=2,
         )
         _draw_inset_accent(canvas, 12, 10, 16, ACTION_MENU_HEIGHT - 10)
         button = tk.Button(
@@ -448,9 +452,6 @@ class BiscuitOverlay:
         self._render_recording_control(status)
 
     def _render_recording_control(self, status: str) -> None:
-        if status == "processing":
-            self._animate_recording_control()
-            return
         self._cancel_recording_control_animation()
         state = recording_control_state(status)
         self._apply_recording_control_state(state)
@@ -559,8 +560,22 @@ class BiscuitOverlay:
             row=3, column=1, sticky="ew", pady=7, ipady=6
         )
 
+        tk.Checkbutton(
+            body,
+            text=STARTUP_SETTING_LABEL,
+            variable=self.run_at_login_var,
+            bg=BLUE_BLACK,
+            fg=EDGE_WHITE,
+            activebackground=BLUE_BLACK,
+            activeforeground=SURFACE_WHITE,
+            selectcolor=PANEL_DEEP,
+            font=UI_FONT,
+            anchor="w",
+            relief=tk.FLAT,
+        ).grid(row=4, column=1, sticky="w", pady=(8, 2))
+
         controls = tk.Frame(body, bg=BLUE_BLACK)
-        controls.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(18, 8))
+        controls.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(18, 8))
         self._button(controls, SETTINGS_ACTION_LABELS["update"], self._update).pack(side=tk.LEFT, padx=(0, 8))
         self._button(controls, SETTINGS_ACTION_LABELS["test"], self._test, GREEN).pack(
             side=tk.LEFT, padx=8
@@ -571,13 +586,13 @@ class BiscuitOverlay:
         self._button(controls, SETTINGS_ACTION_LABELS["save"], self._save, CYAN).pack(side=tk.RIGHT)
 
         status_band = tk.Frame(body, bg=PANEL_DEEP, padx=14, pady=9, highlightthickness=1, highlightbackground=CYAN)
-        status_band.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        status_band.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         tk.Label(status_band, textvariable=self.settings_status, fg=EDGE_WHITE, bg=PANEL_DEEP, font=UI_FONT).pack(
             side=tk.LEFT
         )
 
         test_panel = tk.Frame(body, bg=PANEL_DEEP, padx=14, pady=10, highlightthickness=1, highlightbackground=PANEL)
-        test_panel.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(12, 0))
+        test_panel.grid(row=7, column=0, columnspan=3, sticky="nsew", pady=(12, 0))
         tk.Label(
             test_panel,
             textvariable=self.test_output,
@@ -589,7 +604,7 @@ class BiscuitOverlay:
             wraplength=620,
         ).pack(fill=tk.BOTH, expand=True)
         body.columnconfigure(1, weight=1)
-        body.rowconfigure(6, weight=1)
+        body.rowconfigure(7, weight=1)
 
     def set_settings_status(self, status: str) -> None:
         if self.settings_status:
@@ -654,6 +669,7 @@ class BiscuitOverlay:
         self.config.model_path = self.model_var.get().strip()
         self.config.language = self.language_var.get().strip() or "en"
         self.config.provider = self.provider_var.get().strip() or "auto"
+        self.config.run_at_login = bool(self.run_at_login_var.get())
 
     def _update(self) -> None:
         status = self.settings_callbacks.on_update()

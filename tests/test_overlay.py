@@ -18,6 +18,7 @@ from biscuit.overlay import (
     PANEL,
     RED,
     SETTINGS_ACTION_LABELS,
+    STARTUP_SETTING_LABEL,
     SETTINGS_WINDOW_GEOMETRY,
     SETTINGS_WINDOW_MINSIZE,
     SURFACE_WHITE,
@@ -63,22 +64,22 @@ class RecordingPillPositionTests(unittest.TestCase):
     def test_processing_state_replaces_stop_button_with_running_biscuit(self):
         state = recording_control_state("processing", tick=1)
 
-        self.assertIn("run biscuit, run", state.text)
-        self.assertIn("\n", state.text)
+        self.assertEqual(state.text, "Processing")
+        self.assertNotIn("\n", state.text)
         self.assertNotEqual(state.text, "Stop")
         self.assertEqual(state.tk_state, "disabled")
-        self.assertIn(state.spinner, {"\\(o.o)/", "/(o.o)\\"})
+        self.assertEqual(state.spinner, "")
 
     def test_finished_state_flashes_good_biscuit(self):
         state = recording_control_state("inserted", tick=0)
 
-        self.assertIn("good biscuit", state.text)
-        self.assertIn("\n", state.text)
+        self.assertEqual(state.text, "Ready")
+        self.assertNotIn("\n", state.text)
         self.assertNotEqual(state.text, "Stop")
         self.assertEqual(state.tk_state, "disabled")
 
     def test_visible_text_uses_courier_and_blue_white_tint(self):
-        self.assertEqual(UI_FONT_FAMILY, "Courier New")
+        self.assertEqual(UI_FONT_FAMILY, "Segoe UI")
         self.assertEqual(UI_FONT[0], UI_FONT_FAMILY)
         self.assertEqual(UI_FONT_BOLD[0], UI_FONT_FAMILY)
         self.assertEqual(TEXT, "#f4fbff")
@@ -153,6 +154,9 @@ class RecordingPillPositionTests(unittest.TestCase):
         self.assertEqual(SETTINGS_ACTION_LABELS["update"], "Find Model")
         self.assertEqual(SETTINGS_ACTION_LABELS["test"], "Test Biscuit")
         self.assertEqual(SETTINGS_ACTION_LABELS["stop"], "Stop Biscuit")
+
+    def test_startup_setting_label_names_login_behavior(self):
+        self.assertEqual(STARTUP_SETTING_LABEL, "Run Biscuit when I log in")
 
     def test_closing_settings_hides_fallback_launcher(self):
         calls = []
